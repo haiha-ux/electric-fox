@@ -88,7 +88,49 @@ public class SimulationTool extends Tool
 
 	private SimulationTool() { super("simulation"); }
 
-	public void init() { }
+	public void init()
+	{
+		autoDetectSpice();
+	}
+
+	/**
+	 * Auto-detect ngspice on the system and configure SPICE defaults if not already set by user.
+	 */
+	private static void autoDetectSpice()
+	{
+		String runProgram = getSpiceRunProgram();
+		// Only auto-configure if using factory default "ngspice" (user hasn't customized)
+		if (runProgram.equals("ngspice"))
+		{
+			// Check if ngspice is available on PATH
+			String ngspicePath = findExecutableOnPath("ngspice");
+			if (ngspicePath != null)
+			{
+				System.out.println("SPICE: Auto-detected ngspice at " + ngspicePath);
+			}
+			else
+			{
+				System.out.println("SPICE: ngspice not found on PATH. Install ngspice or configure SPICE settings in Tools > Simulation (Spice) > Set Spice Run Options");
+			}
+		}
+	}
+
+	/**
+	 * Find an executable on the system PATH.
+	 * @param name the executable name to search for.
+	 * @return the full path if found, null otherwise.
+	 */
+	private static String findExecutableOnPath(String name)
+	{
+		String path = System.getenv("PATH");
+		if (path == null) return null;
+		for (String dir : path.split(java.io.File.pathSeparator))
+		{
+			java.io.File f = new java.io.File(dir, name);
+			if (f.isFile() && f.canExecute()) return f.getAbsolutePath();
+		}
+		return null;
+	}
 
 	public static SimulationTool getSimulationTool() { return tool; }
 
@@ -1159,7 +1201,7 @@ public class SimulationTool extends Tool
 		public String toString() { return name;}
 	}
 
-	private static Pref cacheSpiceEngine = Pref.makeIntPref("SpiceEngine", tool.prefs, SpiceEngine.SPICE_ENGINE_H.code());
+	private static Pref cacheSpiceEngine = Pref.makeIntPref("SpiceEngine", tool.prefs, SpiceEngine.SPICE_ENGINE_NG.code());
 	/**
 	 * Method to tell which SPICE engine is being used.
 	 * Since different versions of SPICE have slightly different syntax,
@@ -1287,7 +1329,7 @@ public class SimulationTool extends Tool
 	public static final String spiceRunChoiceRunReportOutput = "Run, Report Output";
 	private static final String [] spiceRunChoices = {spiceRunChoiceDontRun, spiceRunChoiceRunIgnoreOutput, spiceRunChoiceRunReportOutput};
 
-	private static Pref cacheSpiceRunChoice = Pref.makeIntPref("SpiceRunChoice", tool.prefs, 0);
+	private static Pref cacheSpiceRunChoice = Pref.makeIntPref("SpiceRunChoice", tool.prefs, 2);
 	/** Determines possible settings for the Spice Run Choice */
 	public static String [] getSpiceRunChoiceValues() { return spiceRunChoices; }
 	/** Get the current setting for the Spice Run Choice preference */
@@ -1318,7 +1360,7 @@ public class SimulationTool extends Tool
 	/** Get whether or not to use the user-specified spice run directory, by default */
 	public static boolean getFactorySpiceUseRunDir() { return cacheSpiceUseRunDir.getBooleanFactoryValue(); }
 
-	private static Pref cacheSpiceOutputOverwrite = Pref.makeBooleanPref("SpiceOverwriteOutputFile", tool.prefs, false);
+	private static Pref cacheSpiceOutputOverwrite = Pref.makeBooleanPref("SpiceOverwriteOutputFile", tool.prefs, true);
 	/** Get whether or not we automatically overwrite the spice output file */
 	public static boolean getSpiceOutputOverwrite() { return cacheSpiceOutputOverwrite.getBoolean(); }
 	/** Set whether or not we automatically overwrite the spice output file */
@@ -1326,7 +1368,7 @@ public class SimulationTool extends Tool
 	/** Get whether or not we automatically overwrite the spice output file, by default */
 	public static boolean getFactorySpiceOutputOverwrite() { return cacheSpiceOutputOverwrite.getBooleanFactoryValue(); }
 
-	private static Pref cacheSpiceRunProbe = Pref.makeBooleanPref("SpiceRunProbe", tool.prefs, false);
+	private static Pref cacheSpiceRunProbe = Pref.makeBooleanPref("SpiceRunProbe", tool.prefs, true);
 	/** Get whether or not to run the spice probe after running spice */
 	public static boolean getSpiceRunProbe() { return cacheSpiceRunProbe.getBoolean(); }
 	/** Set whether or not to run the spice probe after running spice */
@@ -1334,7 +1376,7 @@ public class SimulationTool extends Tool
 	/** Get whether or not to run the spice probe after running spice, by default */
 	public static boolean getFactorySpiceRunProbe() { return cacheSpiceRunProbe.getBooleanFactoryValue(); }
 
-	private static Pref cacheSpiceRunProgram = Pref.makeStringPref("SpiceRunProgram", tool.prefs, "");
+	private static Pref cacheSpiceRunProgram = Pref.makeStringPref("SpiceRunProgram", tool.prefs, "ngspice");
 	/** Get the spice run program */
 	public static String getSpiceRunProgram() { return cacheSpiceRunProgram.getString(); }
 	/** Set the spice run program */
@@ -1342,7 +1384,7 @@ public class SimulationTool extends Tool
 	/** Get the spice run program, by default */
 	public static String getFactorySpiceRunProgram() { return cacheSpiceRunProgram.getStringFactoryValue(); }
 
-	private static Pref cacheSpiceRunProgramArgs = Pref.makeStringPref("SpiceRunProgramArgs", tool.prefs, "");
+	private static Pref cacheSpiceRunProgramArgs = Pref.makeStringPref("SpiceRunProgramArgs", tool.prefs, "-b -r ${FILENAME_NO_EXT}.raw ${FILEPATH}");
 	/** Get the spice run program arguments */
 	public static String getSpiceRunProgramArgs() { return cacheSpiceRunProgramArgs.getString(); }
 	/** Set the spice run program arguments */

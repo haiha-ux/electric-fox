@@ -81,7 +81,7 @@ public class StatusBar extends JPanel implements HighlightListener, DatabaseChan
 
     public StatusBar(WindowFrame frame) {
         super(new GridBagLayout());
-        setBorder(new BevelBorder(BevelBorder.LOWERED));
+        setBorder(javax.swing.BorderFactory.createMatteBorder(1, 0, 0, 0, javax.swing.UIManager.getColor("Separator.foreground")));
         this.frame = frame;
 
         fieldSelected = new JLabel();

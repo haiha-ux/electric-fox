@@ -24,9 +24,14 @@ package com.sun.electric.tool.user;
 import com.sun.electric.database.text.TextUtils;
 import com.sun.electric.Launcher;
 
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.net.URL;
 
+import javax.swing.Icon;
 import javax.swing.ImageIcon;
+
+import com.formdev.flatlaf.extras.FlatSVGIcon;
 
 /**
  * public class to handle resources like icons/images.
@@ -37,6 +42,40 @@ public class Resources {
 	// Location of valid 3D plugin
 	private static final String plugin3D = "com.sun.electric.plugins.j3d";
     private static final String pluginJython = "org.python.util";
+
+    /**
+	 * Method to load an icon, preferring SVG (modern) over GIF/PNG (legacy).
+	 * SVG icons are rendered to ImageIcon at 16x16 for full compatibility.
+	 * @param theClass class path where the icon resource is stored under
+	 * @param baseName icon name WITHOUT extension (e.g., "ButtonUndo")
+	 * @return ImageIcon (rendered from SVG or loaded from GIF/PNG)
+	 */
+	public static ImageIcon getIcon(Class<?> theClass, String baseName)
+	{
+		// Try SVG first (modern, scalable)
+		URL svgUrl = getURLResource(theClass, baseName + ".svg");
+		if (svgUrl != null)
+		{
+			try
+			{
+				String pkg = theClass.getPackage().getName().replace('.', '/');
+				String svgPath = pkg + "/" + resourceLocation + baseName + ".svg";
+				FlatSVGIcon svgIcon = new FlatSVGIcon(svgPath, 16, 16);
+				if (svgIcon.hasFound())
+				{
+					// Render SVG to BufferedImage and wrap as ImageIcon
+					BufferedImage img = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+					Graphics2D g2 = img.createGraphics();
+					svgIcon.paintIcon(null, g2, 0, 0);
+					g2.dispose();
+					return new ImageIcon(img);
+				}
+			}
+			catch (Exception e) { /* fall through to legacy */ }
+		}
+		// Fallback to GIF/PNG
+		return getResource(theClass, baseName + ".gif");
+	}
 
     /**
 	 * Method to load a valid icon stored in resources package under the given class.

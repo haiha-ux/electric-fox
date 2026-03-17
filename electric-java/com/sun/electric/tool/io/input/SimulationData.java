@@ -75,16 +75,32 @@ public final class SimulationData {
 	 */
 	public static void plotGuessed(Cell cell, WaveformWindow ww) {
         if (cell==null) return;
-        String[] paths = new String[] {
-            FileType.SPICE.getGroupPath(),
-            TextUtils.getFilePath(cell.getLibrary().getLibFile())
-        };
+        // Build search paths: SPICE output dir, library dir, working dir, SPICE run dir
+        java.util.ArrayList<String> pathList = new java.util.ArrayList<>();
+        String spicePath = FileType.SPICE.getGroupPath();
+        if (spicePath != null && !spicePath.isEmpty()) pathList.add(spicePath);
+        String libPath = TextUtils.getFilePath(cell.getLibrary().getLibFile());
+        if (libPath != null && !libPath.isEmpty() && !pathList.contains(libPath)) pathList.add(libPath);
+        String workDir = com.sun.electric.tool.user.User.getWorkingDirectory();
+        if (workDir != null && !workDir.isEmpty() && !pathList.contains(workDir)) pathList.add(workDir);
+        String runDir = SimulationTool.getSpiceRunDir();
+        if (SimulationTool.getSpiceUseRunDir() && runDir != null && !runDir.isEmpty() && !pathList.contains(runDir))
+            pathList.add(runDir);
+        // Also check current JVM working directory
+        String jvmDir = System.getProperty("user.dir");
+        if (jvmDir != null && !jvmDir.isEmpty() && !pathList.contains(jvmDir)) pathList.add(jvmDir);
+
+        String[] paths = pathList.toArray(new String[0]);
+        String cellName = cell.getName();
+        // Try exact cell name first, then case variations
+        String[] nameVariants = new String[] { cellName, cellName.toLowerCase(), cellName.toUpperCase() };
         for (String path : paths)
-            for (String ext : known_extensions)
-                if (new File(path, cell.getName()+'.'+ext).exists()) {
-                    plot(cell, TextUtils.makeURLToFile(new File(path, cell.getName()+'.'+ext).getPath()), ww);
-                    return;
-                }
+            for (String name : nameVariants)
+                for (String ext : known_extensions)
+                    if (new File(path, name+'.'+ext).exists()) {
+                        plot(cell, TextUtils.makeURLToFile(new File(path, name+'.'+ext).getPath()), ww);
+                        return;
+                    }
         System.out.println("unable to guess any simulation file with a known extension; the following directories were checked: ");
         for(String path : paths)
             System.out.println("  " + path);

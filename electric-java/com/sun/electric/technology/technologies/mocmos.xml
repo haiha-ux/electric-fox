@@ -3199,16 +3199,15 @@
 
     <spiceHeader level="1">
         <spiceLine line="*CMOS/BULK-NWELL (PRELIMINARY PARAMETERS)"/>
-        <spiceLine line=".OPTIONS NOMOD DEFL=3UM DEFW=3UM DEFAD=70P DEFAS=70P LIMPTS=1000"/>
-        <spiceLine line="+ITL5=0 RELTOL=0.01 ABSTOL=500PA VNTOL=500UV LVLTIM=2"/>
-        <spiceLine line="+LVLCOD=1"/>
+        <spiceLine line=".OPTIONS NOMOD DEFL=3UM DEFW=3UM DEFAD=70P DEFAS=70P"/>
+        <spiceLine line="+RELTOL=0.01 ABSTOL=500PA VNTOL=500UV"/>
         <spiceLine line=".MODEL N NMOS LEVEL=1"/>
         <spiceLine line="+KP=60E-6 VTO=0.7 GAMMA=0.3 LAMBDA=0.05 PHI=0.6"/>
-        <spiceLine line="+LD=0.4E-6 TOX=40E-9 CGSO=2.0E-10 CGDO=2.0E-10 CJ=.2MF/M^2"/>
+        <spiceLine line="+LD=0.4E-6 TOX=40E-9 CGSO=2.0E-10 CGDO=2.0E-10 CJ=2.0E-4"/>
         <spiceLine line=".MODEL P PMOS LEVEL=1"/>
-        <spiceLine line="+KP=20E-6 VTO=0.7 GAMMA=0.4 LAMBDA=0.05 PHI=0.6"/>
-        <spiceLine line="+LD=0.6E-6 TOX=40E-9 CGSO=3.0E-10 CGDO=3.0E-10 CJ=.2MF/M^2"/>
-        <spiceLine line=".MODEL DIFFCAP D CJO=.2MF/M^2"/>
+        <spiceLine line="+KP=20E-6 VTO=-0.7 GAMMA=0.4 LAMBDA=0.05 PHI=0.6"/>
+        <spiceLine line="+LD=0.6E-6 TOX=40E-9 CGSO=3.0E-10 CGDO=3.0E-10 CJ=2.0E-4"/>
+        <spiceLine line=".MODEL DIFFCAP D CJO=2.0E-4"/>
     </spiceHeader>
 
     <spiceHeader level="2">

@@ -1244,20 +1244,21 @@ public class UserInterfaceMain extends AbstractUserInterface {
             setIconImage(TopLevel.getFrameIcon().getImage());
 
             JPanel whole = new JPanel();
-            whole.setBorder(BorderFactory.createLineBorder(new Color(0, 170, 0), 5));
+            whole.setBorder(BorderFactory.createLineBorder(new Color(196, 123, 43), 3));
             whole.setLayout(new BorderLayout());
 
             ImageIcon splashImage = Resources.getResource(TopLevel.class, "SplashImage.gif");
             JLabel l = new JLabel(splashImage);
             whole.add(l, BorderLayout.CENTER);
             JLabel v = new JLabel("Version " + Version.getVersion(), JLabel.CENTER);
+            v.setBorder(BorderFactory.createEmptyBorder(8, 0, 8, 0));
             whole.add(v, BorderLayout.SOUTH);
             String fontName = User.getFactoryDefaultFont();
-            //String fontName = User.getDefaultFont();
             Font font = new Font(fontName, Font.BOLD, 24);
             v.setFont(font);
-            v.setForeground(Color.BLACK);
-            v.setBackground(Color.WHITE);
+            v.setForeground(new Color(26, 22, 18));
+            v.setBackground(new Color(250, 246, 241));
+            v.setOpaque(true);
 
             getContentPane().add(whole, BorderLayout.SOUTH);
 

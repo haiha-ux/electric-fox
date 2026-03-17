@@ -91,6 +91,7 @@ import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.SwingUtilities;
 
 /**
  * This class defines a single panel of WaveSignals with an associated list of signal names.
@@ -99,7 +100,7 @@ public class Panel extends JPanel
 	implements MouseMotionListener, MouseListener, MouseWheelListener, KeyListener
 {
 	/** Use VolatileImage for offscreen buffer */           private static final boolean USE_VOLATILE_IMAGE = false;
-	/** Use anti-aliasing for lines */                      private static final boolean USE_ANTIALIASING = false;
+	/** Use anti-aliasing for lines */                      private static final boolean USE_ANTIALIASING = true;
 	/** Spacing above and below each panel */               private static final int PANELGAP = 2;
 
 	/** the main waveform window this is part of */			private WaveformWindow waveWindow;
@@ -142,14 +143,15 @@ public class Panel extends JPanel
 //	/** current panel */									private static Panel curPanel;
 //	/** current X coordinate in the panel */				private static int curXPos;
 
-	/** The color of the grid (a gray) */					private static final Color gridColor = new Color(0x808080);
+	/** The color of the grid (subtle) */					private static final Color gridColor = new Color(0xC0C0C0);
+	/** Stroke for signal lines (slightly thicker for clarity) */	private static final BasicStroke signalStroke = new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
 	/** for drawing far-dotted lines */						private static final BasicStroke farDottedLine = new BasicStroke(1, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[] {4,12}, 0);
 	/** the size of control point squares */				private static final int CONTROLPOINTSIZE = 6;
 	/** the width of the panel label on the left */			private static final int VERTLABELWIDTH = 60;
-	private static final ImageIcon iconHidePanel = Resources.getResource(WaveformWindow.class, "ButtonSimHide.gif");
-	private static final ImageIcon iconClosePanel = Resources.getResource(WaveformWindow.class, "ButtonSimClose.gif");
-	private static final ImageIcon iconDeleteSignal = Resources.getResource(WaveformWindow.class, "ButtonSimDelete.gif");
-	private static final ImageIcon iconDeleteAllSignals = Resources.getResource(WaveformWindow.class, "ButtonSimDeleteAll.gif");
+	private static final ImageIcon iconHidePanel = Resources.getIcon(WaveformWindow.class, "ButtonSimHide");
+	private static final ImageIcon iconClosePanel = Resources.getIcon(WaveformWindow.class, "ButtonSimClose");
+	private static final ImageIcon iconDeleteSignal = Resources.getIcon(WaveformWindow.class, "ButtonSimDelete");
+	private static final ImageIcon iconDeleteAllSignals = Resources.getIcon(WaveformWindow.class, "ButtonSimDeleteAll");
 	private static final Cursor dragXPositionCursor = ToolBar.readCursor("CursorDragTime.gif", 8, 8);
 
 	/**
@@ -1174,11 +1176,15 @@ public class Panel extends JPanel
 			}
 		}
 
-		// draw all of the signals
+		// draw all of the signals with anti-aliasing and thicker strokes
 		if (USE_ANTIALIASING && localGraphics != null) {
 			Object oldAntialiasing = localGraphics.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
+			java.awt.Stroke oldStroke = localGraphics.getStroke();
 			localGraphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			localGraphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+			localGraphics.setStroke(signalStroke);
 			processSignals(localGraphics, bounds, polys);
+			localGraphics.setStroke(oldStroke);
 			localGraphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAntialiasing);
 		} else {
 			processSignals(localGraphics, bounds, polys);
@@ -1630,11 +1636,17 @@ public class Panel extends JPanel
 					menu.show(this, evt.getX(), evt.getY());
 					return;
 				}
+				// right click in waveform area: show panel context menu
+				showPanelContextMenu(evt);
+				return;
 			}
 		}
 		for(Iterator<Panel> it = waveWindow.getPanels(); it.hasNext(); )
 			it.next().curMeasurement = null;
-		if (mode == ToolBar.CursorMode.ZOOM) mousePressedZoom(evt); else
+		// Ctrl+left-click or middle-button = pan regardless of toolbar mode
+		if (isCtrlDrag(evt) || SwingUtilities.isMiddleMouseButton(evt))
+			mousePressedPan(evt);
+		else if (mode == ToolBar.CursorMode.ZOOM) mousePressedZoom(evt); else
 			if (mode == ToolBar.CursorMode.PAN) mousePressedPan(evt); else
 				mousePressedSelect(evt);
 	}
@@ -1644,7 +1656,9 @@ public class Panel extends JPanel
 		ToolBar.CursorMode mode = ToolBar.getCursorMode();
 		if (ClickZoomWireListener.isRightMouse(evt) && (evt.getModifiersEx()&MouseEvent.SHIFT_DOWN_MASK) != 0)
 			mode = ToolBar.CursorMode.ZOOM;
-		if (mode == ToolBar.CursorMode.ZOOM) mouseReleasedZoom(evt); else
+		if (isCtrlDrag(evt) || SwingUtilities.isMiddleMouseButton(evt))
+			mouseReleasedPan(evt);
+		else if (mode == ToolBar.CursorMode.ZOOM) mouseReleasedZoom(evt); else
 			if (mode == ToolBar.CursorMode.PAN) mouseReleasedPan(evt); else
 				mouseReleasedSelect(evt);
 
@@ -1677,6 +1691,12 @@ public class Panel extends JPanel
 	public void mouseDragged(MouseEvent evt)
 	{
 //		curXPos = evt.getX();
+		// Ctrl+left-drag or middle-button drag = pan regardless of toolbar mode
+		if (isCtrlDrag(evt) || SwingUtilities.isMiddleMouseButton(evt))
+		{
+			mouseDraggedPan(evt);
+			return;
+		}
 		ToolBar.CursorMode mode = ToolBar.getCursorMode();
 		if (ClickZoomWireListener.isRightMouse(evt) && (evt.getModifiersEx()&MouseEvent.SHIFT_DOWN_MASK) != 0)
 			mode = ToolBar.CursorMode.ZOOM;
@@ -1685,10 +1705,59 @@ public class Panel extends JPanel
         else mouseDraggedSelect(evt);
 	}
 
+	private boolean isCtrlDrag(MouseEvent evt)
+	{
+		return (evt.getModifiersEx() & MouseEvent.CTRL_DOWN_MASK) != 0 && SwingUtilities.isLeftMouseButton(evt);
+	}
+
 	/**
 	 * the MouseWheelListener events
 	 */
-	public void mouseWheelMoved(MouseWheelEvent evt) {}
+	public void mouseWheelMoved(MouseWheelEvent evt)
+	{
+		int clicks = evt.getWheelRotation();
+		if (clicks == 0) return;
+
+		boolean zoomY = (evt.getModifiersEx() & MouseEvent.CTRL_DOWN_MASK) != 0;
+		double zoomFactor = (clicks > 0) ? 1.25 : 0.8; // scroll down = zoom out, up = zoom in
+
+		if (zoomY)
+		{
+			// Zoom Y-axis centered on mouse position
+			double mouseY = convertYScreenToData(evt.getY());
+			double low = getYAxisLowValue();
+			double high = getYAxisHighValue();
+			double newLow = mouseY + (low - mouseY) * zoomFactor;
+			double newHigh = mouseY + (high - mouseY) * zoomFactor;
+			setYAxisRange(newLow, newHigh);
+		}
+		else
+		{
+			// Zoom X-axis centered on mouse position
+			double mouseX = convertXScreenToData(evt.getX());
+			double low = getMinXAxis();
+			double high = getMaxXAxis();
+			double newLow = mouseX + (low - mouseX) * zoomFactor;
+			double newHigh = mouseX + (high - mouseX) * zoomFactor;
+
+			if (waveWindow.isXAxisLocked())
+			{
+				// Apply to all panels
+				for (java.util.Iterator<Panel> it = waveWindow.getPanels(); it.hasNext(); )
+				{
+					Panel p = it.next();
+					p.setXAxisRange(newLow, newHigh);
+					p.repaintWithRulers();
+				}
+				return;
+			}
+			else
+			{
+				setXAxisRange(newLow, newHigh);
+			}
+		}
+		repaintWithRulers();
+	}
 
 	/**
 	 * the KeyListener events
@@ -1696,9 +1765,94 @@ public class Panel extends JPanel
 	public void keyPressed(KeyEvent evt)
 	{
 		waveWindow.vcrClickStop();
+		int code = evt.getKeyCode();
+		if (code == KeyEvent.VK_F)
+		{
+			// 'F' = auto-fit: fit all panels to their signals
+			for (java.util.Iterator<Panel> it = waveWindow.getPanels(); it.hasNext(); )
+				it.next().fitToSignal(null);
+			waveWindow.fillScreen();
+		}
 	}
 	public void keyReleased(KeyEvent evt) {}
 	public void keyTyped(KeyEvent evt) {}
+
+	private void showPanelContextMenu(MouseEvent evt)
+	{
+		JPopupMenu menu = new JPopupMenu();
+
+		// Find highlighted signal in this panel
+		WaveSignal highlightedSig = null;
+		for (WaveSignal ws : getSignals())
+		{
+			if (ws.isHighlighted()) { highlightedSig = ws; break; }
+		}
+
+		// "Move to New Panel" — move highlighted signal to a new panel
+		if (highlightedSig != null && getNumSignals() > 1)
+		{
+			final WaveSignal moveSig = highlightedSig;
+			JMenuItem moveItem = new JMenuItem("Move \"" + moveSig.getSignal().getFullName() + "\" to New Panel");
+			moveItem.addActionListener(e -> {
+				Signal<?> sig = moveSig.getSignal();
+				Color col = moveSig.getColor();
+				removeHighlightedSignal(moveSig, false);
+				removeSignal(moveSig.getButton());
+				Panel newPanel = waveWindow.makeNewPanel(-1);
+				WaveSignal.addSignalToPanel(sig, newPanel, col);
+				waveWindow.reloadTable();
+				waveWindow.rebuildPanelList();
+			});
+			menu.add(moveItem);
+		}
+
+		// "Remove Signal" — remove highlighted signal
+		if (highlightedSig != null)
+		{
+			final WaveSignal removeSig = highlightedSig;
+			JMenuItem removeItem = new JMenuItem("Remove \"" + removeSig.getSignal().getFullName() + "\"");
+			removeItem.addActionListener(e -> {
+				removeHighlightedSignal(removeSig, false);
+				removeSignal(removeSig.getButton());
+				repaintContents();
+			});
+			menu.add(removeItem);
+		}
+
+		if (menu.getComponentCount() > 0) menu.addSeparator();
+
+		// "Fit to All Signals"
+		JMenuItem fitItem = new JMenuItem("Fit to All Signals");
+		fitItem.addActionListener(e -> fitToSignal(null));
+		menu.add(fitItem);
+
+		// "New Empty Panel"
+		JMenuItem newPanelItem = new JMenuItem("New Empty Panel");
+		newPanelItem.addActionListener(e -> {
+			waveWindow.makeNewPanel(-1);
+			waveWindow.reloadTable();
+			waveWindow.rebuildPanelList();
+		});
+		menu.add(newPanelItem);
+
+		// "Delete Panel"
+		JMenuItem deleteItem = new JMenuItem("Delete Panel");
+		deleteItem.addActionListener(e -> waveWindow.closePanel(this));
+		menu.add(deleteItem);
+
+		menu.addSeparator();
+
+		// "Auto-Fit All Panels"
+		JMenuItem fitAllItem = new JMenuItem("Auto-Fit All Panels");
+		fitAllItem.addActionListener(e -> {
+			for (java.util.Iterator<Panel> it = waveWindow.getPanels(); it.hasNext(); )
+				it.next().fitToSignal(null);
+			waveWindow.fillScreen();
+		});
+		menu.add(fitAllItem);
+
+		menu.show(this, evt.getX(), evt.getY());
+	}
 
 	private void panelTitleClicked(ActionEvent evt)
 	{

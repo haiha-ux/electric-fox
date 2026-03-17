@@ -98,8 +98,8 @@ public class ToolbarTab extends PreferencePanel implements TreeSelectionListener
 	private MenuTreeNode currentTreeNode;
 	private PreferencesFrame trueParent;
 	private static ImageIcon menuIcon = Resources.getResource(ToolBar.class, "ButtonMenu.gif");
-	private static ImageIcon trashIcon = Resources.getResource(ToolBar.class, "IconTrash.gif");
-	private static ImageIcon separatorIcon = Resources.getResource(ToolBar.class, "IconSeparator.gif");
+	private static ImageIcon trashIcon = Resources.getIcon(ToolBar.class, "IconTrash");
+	private static ImageIcon separatorIcon = Resources.getIcon(ToolBar.class, "IconSeparator");
 	private static ImageIcon separatorButton = Resources.getResource(ToolBar.class, "ButtonSeparator.gif");
 
 	/** Creates new form ToolbarTab */

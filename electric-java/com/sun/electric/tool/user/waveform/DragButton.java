@@ -59,8 +59,10 @@ public class DragButton extends JButton implements DragGestureListener, DragSour
 		String command = "MOVEBUTTON";
 
 		if ((e.getTriggerEvent().getModifiersEx()&MouseEvent.SHIFT_DOWN_MASK) != 0)
-		style = DragSource.DefaultCopyDrop;
-		command = "COPYBUTTON";
+		{
+			style = DragSource.DefaultCopyDrop;
+			command = "COPYBUTTON";
+		}
 
 		// make the Transferable Object
 		Transferable transferable = new StringSelection("PANEL " + panelNumber + " " + command+ " " + getText());

@@ -196,6 +196,14 @@ public class Maker
 		Object result = createLayout(destLib, makeData);
 		if (result instanceof String) return result;
 
+		// report layout dimensions
+		double width = makeData.maxX - makeData.minX;
+		double height = makeData.maxY - makeData.minY;
+		int numRows = 0;
+		for (MakerRow r = makeData.rows; r != null; r = r.next) numRows++;
+		System.out.println("  Layout: " + String.format("%.1f", width) + " x " +
+			String.format("%.1f", height) + " (" + numRows + " rows)");
+
 		return result;
 	}
 
@@ -1119,7 +1127,7 @@ public class Maker
 		PortInst piA = instA.findPortInstFromEquivalentProto(portA);
 		PortInst piB = instB.findPortInstFromEquivalentProto(portB);
 		Poly polyA = piA.getPoly();
-		Poly polyB = piA.getPoly();
+		Poly polyB = piB.getPoly();
 		double xA = polyA.getCenterX();
 		double yA = polyA.getCenterY();
 		double xB = polyB.getCenterX();
@@ -1167,7 +1175,7 @@ public class Maker
 		PortInst piA = instA.findPortInstFromEquivalentProto(portA);
 		PortInst piB = instB.findPortInstFromEquivalentProto(portB);
 		Poly polyA = piA.getPoly();
-		Poly polyB = piA.getPoly();
+		Poly polyB = piB.getPoly();
 		double xA = polyA.getCenterX();
 		double yA = polyA.getCenterY();
 		double xB = polyB.getCenterX();
@@ -1268,7 +1276,7 @@ public class Maker
 			Layer nWellLay = tech.findLayerFromFunction(Layer.Function.WELLN, -1);
 			if (nWellLay != null) nWellProto = nWellLay.getPureLayerNode();
 			if (nWellProto == null)
-				return "SC Maker cannot find P-WELL layer in technology " + tech.getTechName();
+				return "SC Maker cannot find N-WELL layer in technology " + tech.getTechName();
 		}
 
 		return null;

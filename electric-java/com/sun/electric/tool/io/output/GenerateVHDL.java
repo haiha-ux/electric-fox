@@ -707,10 +707,17 @@ public class GenerateVHDL extends Topology
 				PrimitivePort pp = it.next();
 				if (!matchesPass(pp.getCharacteristic(), pass)) continue;
 				String portName = pp.getName();
-				if (special == BLOCKPOSLOGIC || special == BLOCKBUFFER || special == BLOCKINVERTER)
+				if (special == BLOCKPOSLOGIC || special == BLOCKBUFFER || special == BLOCKINVERTER ||
+					special == BLOCKNAND || special == BLOCKNOR || special == BLOCKXNOR)
 				{
 					// ignore ports not named "a" or "y"
 					if (!portName.equals("a") && !portName.equals("y")) continue;
+				}
+
+				// ignore the bias port of 4-port schematic transistors
+				if (pnp == Schematics.tech().transistor4Node)
+				{
+					if (portName.equals("b")) continue;
 				}
 
 				// ignore the bias port of layout transistors

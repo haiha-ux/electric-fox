@@ -83,10 +83,10 @@ public class LayerTab extends JPanel implements DragSourceListener, DragGestureL
     private LayerVisibility lv;
 	private final InvisibleLayerConfiguration invLayerConfigs = InvisibleLayerConfiguration.getOnly();
 
-	private static final ImageIcon iconVisNew = Resources.getResource(LayerTab.class, "IconVisNew.gif");
-	private static final ImageIcon iconVisSet = Resources.getResource(LayerTab.class, "IconVisSet.gif");
-	private static final ImageIcon iconVisRename = Resources.getResource(LayerTab.class, "IconVisRename.gif");
-	private static final ImageIcon iconVisDelete = Resources.getResource(LayerTab.class, "IconVisDelete.gif");
+	private static final ImageIcon iconVisNew = Resources.getIcon(LayerTab.class, "IconVisNew");
+	private static final ImageIcon iconVisSet = Resources.getIcon(LayerTab.class, "IconVisSet");
+	private static final ImageIcon iconVisRename = Resources.getIcon(LayerTab.class, "IconVisRename");
+	private static final ImageIcon iconVisDelete = Resources.getIcon(LayerTab.class, "IconVisDelete");
 
 	/**
 	 * Constructor creates a new panel for the Layers tab.

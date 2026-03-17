@@ -236,18 +236,16 @@ public abstract class Topology extends Output
 
 		public boolean enterCell(HierarchyEnumerator.CellInfo info)
 		{
-			if (skipCellAndSubcells(info.getCell()))
+			// Never skip the root (top-level) cell — only skip subcells with templates/model files
+			if (!info.isRootCell() && skipCellAndSubcells(info.getCell()))
 			{
-				if (!info.isRootCell())
-				{
-					// save subcell topology, even though the cell isn't being written
-					HierarchyEnumerator.CellInfo parentInfo = info.getParentInfo();
-					Nodable no = info.getParentInst();
-					String parameterizedName = parameterizedName(no, parentInfo.getContext());
-					CellNetInfo cni = getNetworkInformation(info.getCell(), false, parameterizedName,
-						isNetworksUseExportedNames(), info);
-					cellTopos.put(parameterizedName, cni);
-				}
+				// save subcell topology, even though the cell isn't being written
+				HierarchyEnumerator.CellInfo parentInfo = info.getParentInfo();
+				Nodable no = info.getParentInst();
+				String parameterizedName = parameterizedName(no, parentInfo.getContext());
+				CellNetInfo cni = getNetworkInformation(info.getCell(), false, parameterizedName,
+					isNetworksUseExportedNames(), info);
+				cellTopos.put(parameterizedName, cni);
 				validateSkippedCell(info);
 				return false;
 			}

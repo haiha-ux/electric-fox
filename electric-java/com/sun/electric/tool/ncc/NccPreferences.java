@@ -46,7 +46,7 @@ public class NccPreferences {
 	private Pref.Group prefs = Pref.groupForPackage(this.getClass());
 
 	private static Pref checkSizes = 
-		Pref.makeBooleanPref("CheckSizes", NccPreferences.tool.prefs, false);
+		Pref.makeBooleanPref("CheckSizes", NccPreferences.tool.prefs, true);
 	public static boolean getCheckSizes() {
 		return checkSizes.getBoolean(); 
 	}

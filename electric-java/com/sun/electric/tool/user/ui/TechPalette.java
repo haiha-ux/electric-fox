@@ -64,6 +64,8 @@ import com.sun.electric.util.math.DBMath;
 import com.sun.electric.util.math.FixpTransform;
 import com.sun.electric.util.math.Orientation;
 
+import java.awt.AlphaComposite;
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -75,6 +77,7 @@ import java.awt.GridBagLayout;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.Stroke;
 import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DragGestureEvent;
 import java.awt.dnd.DragGestureListener;
@@ -110,6 +113,7 @@ import java.util.List;
 import java.util.Map;
 
 import javax.swing.BorderFactory;
+import javax.swing.UIManager;
 import javax.swing.DefaultListModel;
 import javax.swing.JList;
 import javax.swing.JMenuItem;
@@ -691,7 +695,10 @@ public class TechPalette extends JPanel implements MouseListener, MouseMotionLis
             pureScrollPane.setPreferredSize(new Dimension(200, 200));
             pureScrollPane.setViewportView(pureList);
             JPanel purePanel = new JPanel();
-            purePanel.setBorder(BorderFactory.createBevelBorder(BevelBorder.RAISED));
+            purePanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UIManager.getColor("Component.borderColor") != null ?
+                    UIManager.getColor("Component.borderColor") : Color.GRAY, 1),
+                BorderFactory.createEmptyBorder(2, 2, 2, 2)));
             purePanel.setLayout(new GridBagLayout());
             GridBagConstraints gbc = new GridBagConstraints();
             gbc.gridx = 0;   gbc.gridy = 0;
@@ -1129,19 +1136,27 @@ public class TechPalette extends JPanel implements MouseListener, MouseMotionLis
         } while (paletteImage.contentsLost());
         paletteImageStale = false;
 
+        Graphics2D g2 = (Graphics2D)g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        Stroke oldStroke = g2.getStroke();
+
+        int hlArc = Math.max(entrySize / 8, 6);
+
         // highlight node that user selected
         if (highlightedNode != null) {
-            // draw highlights around cell with highlighted node
-            int index = inPalette.indexOf(highlightedNode);
-            if (index >= 0) {
-                // put the Image in the proper place
-                int x = index / menuY;
-                int y = index % menuY;
+            int hlIndex = inPalette.indexOf(highlightedNode);
+            if (hlIndex >= 0) {
+                int x = hlIndex / menuY;
+                int y = hlIndex % menuY;
                 int imgX = x * (entrySize+1)+1;
                 int imgY = (menuY-y-1) * (entrySize+1)+1;
-                g.setColor(Color.BLUE);
-                g.drawRect(imgX+1, imgY+1, entrySize-3, entrySize-3);
-                g.drawRect(imgX+2, imgY+2, entrySize-5, entrySize-5);
+                Color selColor = getSelectionColor();
+                g2.setColor(new Color(selColor.getRed(), selColor.getGreen(), selColor.getBlue(), 35));
+                g2.fillRoundRect(imgX+1, imgY+1, entrySize-2, entrySize-2, hlArc, hlArc);
+                g2.setColor(new Color(selColor.getRed(), selColor.getGreen(), selColor.getBlue(), 180));
+                g2.setStroke(new BasicStroke(2.0f));
+                g2.drawRoundRect(imgX+2, imgY+2, entrySize-4, entrySize-4, hlArc, hlArc);
+                g2.setStroke(oldStroke);
             }
         }
 
@@ -1165,9 +1180,13 @@ public class TechPalette extends JPanel implements MouseListener, MouseMotionLis
             int y = index % menuY;
             int imgX = x * (entrySize+1)+1;
             int imgY = (menuY-y-1) * (entrySize+1)+1;
-            g.setColor(Color.RED);
-            g.drawRect(imgX+1, imgY+1, entrySize-3, entrySize-3);
-            g.drawRect(imgX+2, imgY+2, entrySize-5, entrySize-5);
+            Color arcColor = getArcHighlightColor();
+            g2.setColor(new Color(arcColor.getRed(), arcColor.getGreen(), arcColor.getBlue(), 30));
+            g2.fillRoundRect(imgX+1, imgY+1, entrySize-2, entrySize-2, hlArc, hlArc);
+            g2.setColor(new Color(arcColor.getRed(), arcColor.getGreen(), arcColor.getBlue(), 160));
+            g2.setStroke(new BasicStroke(1.5f));
+            g2.drawRoundRect(imgX+2, imgY+2, entrySize-4, entrySize-4, hlArc, hlArc);
+            g2.setStroke(oldStroke);
         }
     }
 
@@ -1181,6 +1200,7 @@ public class TechPalette extends JPanel implements MouseListener, MouseMotionLis
         offscreen = new PixelDrawing(new Dimension(entrySize, entrySize));
 
         Graphics2D g = (Graphics2D)paletteImage.getGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setBackground(new Color(User.getColor(User.ColorPrefType.BACKGROUND)));
         g.clearRect(0, 0, getWidth(), getHeight());
         GraphicsPreferences gp = UserInterfaceMain.getGraphicsPreferences();
@@ -1234,8 +1254,8 @@ public class TechPalette extends JPanel implements MouseListener, MouseMotionLis
                     if (wid+arcLength < largest) arcLength = largest - wid;
 
                     // render the arc
-                    double scalex = entrySize/largest * 0.8;
-                    double scaley = entrySize/largest * 0.8;
+                    double scalex = entrySize/largest * 0.85;
+                    double scaley = entrySize/largest * 0.85;
                     double scale = Math.min(scalex, scaley);
 
             		// draw the arc
@@ -1245,8 +1265,7 @@ public class TechPalette extends JPanel implements MouseListener, MouseMotionLis
                     VectorCache.VectorBase[] shapes = VectorCache.drawPolys(a, ap.getShapeOfDummyArc(ep, arcLength));
                     drawShapes(g, gp, imgX, imgY, scale, shapes);
 
-                    g.setColor(Color.RED);
-                    g.drawRect(imgX, imgY, entrySize-1, entrySize-1);
+                    drawEntryBorder(g, imgX, imgY);
                 }
                 if (toDraw instanceof NodeProto || toDraw instanceof NodeInst) {
                     NodeInst ni;
@@ -1267,28 +1286,30 @@ public class TechPalette extends JPanel implements MouseListener, MouseMotionLis
                     {
                     	String str = ni.getProto().getName();
                         int defSize = 12;
-                        Font f = new Font(User.getDefaultFont(), Font.BOLD, defSize);
+                        Font f = new Font(User.getDefaultFont(), Font.PLAIN, defSize);
                         FontMetrics fm = g.getFontMetrics(f);
                         float width = fm.stringWidth(str);
-                        if (width > entryRect.width)
+                        if (width > entryRect.width - 4)
                         {
-                        	defSize = (int)(defSize * entryRect.width / width);
-                            f = new Font(User.getDefaultFont(), Font.BOLD, defSize);
+                        	defSize = (int)(defSize * (entryRect.width - 4) / width);
+                        	if (defSize < 7) defSize = 7;
+                            f = new Font(User.getDefaultFont(), Font.PLAIN, defSize);
                             fm = g.getFontMetrics(f);
                             width = fm.stringWidth(str);
                         }
                         g.setFont(f);
-                        g.setColor(new Color(User.getColor(User.ColorPrefType.TEXT)));
-                        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-                        g.drawString(str, imgX + (entryRect.width - width)/2, imgY + (entryRect.height + (float)fm.getAscent())/2);
+                        Color textColor = new Color(User.getColor(User.ColorPrefType.TEXT));
+                        g.setColor(new Color(textColor.getRed(), textColor.getGreen(), textColor.getBlue(), 200));
+                        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
+                        g.drawString(str, imgX + (entryRect.width - width)/2 + 1, imgY + (entryRect.height + (float)fm.getAscent())/2);
                     } else
                     {
 	                    PrimitiveNode np = (PrimitiveNode)ni.getProto();
 	                    double largest = getLargestDimension(np, ep);
 
 	                    // render it
-	                    double scalex = entrySize/largest * 0.8;
-	                    double scaley = entrySize/largest * 0.8;
+	                    double scalex = entrySize/largest * 0.85;
+	                    double scaley = entrySize/largest * 0.85;
 	                    double scale = Math.min(scalex, scaley);
 
 	                    // make sure the text is at the bottom of the entry
@@ -1310,8 +1331,7 @@ public class TechPalette extends JPanel implements MouseListener, MouseMotionLis
 	                    VectorCache.VectorBase[] shapes = VectorCache.drawNode(ni);
 	                    drawShapes(g, gp, imgX, imgY, scale, shapes);
                     }
-                    g.setColor(Color.BLUE);
-                    g.drawRect(imgX, imgY, entrySize-1, entrySize-1);
+                    drawEntryBorder(g, imgX, imgY);
                 }
                 if (toDraw instanceof String) {
                     String str = (String)toDraw;
@@ -1323,33 +1343,35 @@ public class TechPalette extends JPanel implements MouseListener, MouseMotionLis
                     	int colonPos = str.indexOf(':');
                     	if (colonPos < 0) str = str.substring(9); else
                     		str = str.substring(colonPos+1);
-                        g.setColor(Color.BLUE);
-                        g.drawRect(imgX, imgY, entrySize-1, entrySize-1);
+                        drawEntryBorder(g, imgX, imgY);
                     }
 
-                    int defSize = 18;
-                    Font f = new Font(User.getDefaultFont(), Font.BOLD, defSize);
+                    int defSize = 16;
+                    Font f = new Font(User.getDefaultFont(), Font.PLAIN, defSize);
                     FontMetrics fm = g.getFontMetrics(f);
                     float width = fm.stringWidth(str);
-                    if (width > entryRect.width)
+                    if (width > entryRect.width - 4)
                     {
-                    	defSize = (int)(defSize * entryRect.width / width);
-                        f = new Font(User.getDefaultFont(), Font.BOLD, defSize);
+                    	defSize = (int)(defSize * (entryRect.width - 4) / width);
+                    	if (defSize < 8) defSize = 8;
+                        f = new Font(User.getDefaultFont(), Font.PLAIN, defSize);
                         fm = g.getFontMetrics(f);
                         width = fm.stringWidth(str);
                     }
                     g.setFont(f);
-                    g.setColor(new Color(User.getColor(User.ColorPrefType.TEXT)));
-                    g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-                    g.drawString(str, imgX + (entryRect.width - width)/2, imgY + (entryRect.height + (float)fm.getAscent())/2);
+                    Color textColor = new Color(User.getColor(User.ColorPrefType.TEXT));
+                    g.setColor(new Color(textColor.getRed(), textColor.getGreen(), textColor.getBlue(), 200));
+                    g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
+                    g.drawString(str, imgX + (entryRect.width - width)/2 + 1, imgY + (entryRect.height + (float)fm.getAscent())/2);
                 }
                 if (drawArrow) drawArrow(g, x, y);
             }
         }
         offscreen = null;
 
-        // show dividing lines
-        g.setColor(new Color(User.getColor(User.ColorPrefType.GRID)));
+        // Grid dividing lines — clear boundaries between entries
+        Color gridBase = new Color(User.getColor(User.ColorPrefType.GRID));
+        g.setColor(new Color(gridBase.getRed(), gridBase.getGreen(), gridBase.getBlue(), 120));
         for(int i=0; i<=menuX; i++) {
             int xPos = (entrySize+1) * i;
             g.drawLine(xPos, 0, xPos, menuY*(entrySize+1));
@@ -1386,19 +1408,30 @@ public class TechPalette extends JPanel implements MouseListener, MouseMotionLis
         return largest;
     }
 
+    private void drawEntryBorder(Graphics2D g, int imgX, int imgY) {
+        int arc = Math.max(entrySize / 8, 6);
+        // Subtle inner shadow for depth
+        Color borderColor = getEntryBorderColor();
+        g.setColor(new Color(borderColor.getRed(), borderColor.getGreen(), borderColor.getBlue(), 30));
+        g.fillRoundRect(imgX + 1, imgY + 1, entrySize - 2, entrySize - 2, arc, arc);
+        // Clean border
+        g.setColor(new Color(borderColor.getRed(), borderColor.getGreen(), borderColor.getBlue(), 80));
+        g.drawRoundRect(imgX + 1, imgY + 1, entrySize - 3, entrySize - 3, arc, arc);
+    }
+
     private void drawArrow(Graphics g, int x, int y) {
         int imgX = x * (entrySize+1)+1;
         int imgY = (menuY-y-1) * (entrySize+1)+1;
-        int [] arrowX = new int[3];
-        int [] arrowY = new int[3];
-        arrowX[0] = imgX-2 + entrySize*7/8;
-        arrowY[0] = imgY-2 + entrySize;
-        arrowX[1] = imgX-2 + entrySize;
-        arrowY[1] = imgY-2 + entrySize*7/8;
-        arrowX[2] = imgX-2 + entrySize*7/8;
-        arrowY[2] = imgY-2 + entrySize*3/4;
-        g.setColor(new Color(User.getColor(User.ColorPrefType.GRID)));
-        g.fillPolygon(arrowX, arrowY, 3);
+        // Draw a small downward-pointing triangle at bottom-right corner
+        int arrowSize = Math.max(entrySize / 4, 6);
+        int bx = imgX + entrySize - arrowSize - 2;
+        int by = imgY + entrySize - arrowSize - 2;
+        int [] arrowXpts = new int[] { bx, bx + arrowSize, bx + arrowSize };
+        int [] arrowYpts = new int[] { by + arrowSize, by + arrowSize, by };
+        // Use a solid, visible color for the arrow indicator
+        Color arrowColor = getSelectionColor();
+        g.setColor(new Color(arrowColor.getRed(), arrowColor.getGreen(), arrowColor.getBlue(), 200));
+        g.fillPolygon(arrowXpts, arrowYpts, 3);
     }
 
 	/**
@@ -1406,5 +1439,26 @@ public class TechPalette extends JPanel implements MouseListener, MouseMotionLis
 	 */
     private void drawShapes(Graphics2D g, GraphicsPreferences gp, int imgX, int imgY, double scale, VectorCache.VectorBase[] shapes) {
         AbstractDrawing.drawShapes(g, gp, imgX, imgY, scale, shapes, offscreen, entryRect);
+    }
+
+    private static Color getSelectionColor() {
+        Color c = UIManager.getColor("Component.focusColor");
+        if (c != null) return c;
+        c = UIManager.getColor("TabbedPane.selectedBackground");
+        if (c != null) return c;
+        return new Color(0xC47B2B);
+    }
+
+    private static Color getArcHighlightColor() {
+        Color c = UIManager.getColor("Component.warning.focusedBorderColor");
+        if (c != null) return c;
+        return new Color(0xD4944A);
+    }
+
+    private static Color getEntryBorderColor() {
+        Color c = UIManager.getColor("Component.borderColor");
+        if (c != null) return c;
+        Color grid = new Color(User.getColor(User.ColorPrefType.GRID));
+        return new Color(grid.getRed(), grid.getGreen(), grid.getBlue(), 140);
     }
 }

@@ -26,6 +26,8 @@ import static com.sun.electric.tool.user.menus.EMenuItem.SEPARATOR;
 
 import com.sun.electric.database.geometry.EGraphics;
 import com.sun.electric.database.hierarchy.Cell;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
 import com.sun.electric.database.hierarchy.EDatabase;
 import com.sun.electric.database.text.Pref;
 import com.sun.electric.technology.Layer;
@@ -77,6 +79,8 @@ import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
+
+import com.sun.electric.tool.user.ui.themes.ElectricThemeManager;
 
 /**
  * Class to handle the commands in the "Window" pulldown menu.
@@ -251,6 +255,14 @@ public class WindowMenu {
                     importCadencePreferences(); }}
                     ),
 
+            new EMenu("_Theme",
+                new EMenuItem("_Light Theme") { public void run() {
+                    ElectricThemeManager.setLightTheme(); }},
+                new EMenuItem("_Dark Theme") { public void run() {
+                    ElectricThemeManager.setDarkTheme(); }},
+                new EMenuItem("_Toggle Light/Dark") { public void run() {
+                    ElectricThemeManager.toggleTheme(); }}),
+
 		// mnemonic keys available: AB   FGHIJKLMNO Q  TUVW  Z
             new EMenu("W_aveform Window",
 		        new EMenuItem("_Save Waveform Window Configuration to Disk...") { public void run() {
@@ -394,8 +406,10 @@ public class WindowMenu {
                 } }
                 ),
 
-		// mnemonic keys available: AB DE GHIJKLMNOPQR  UVWXYZ
+		// mnemonic keys available:  B DE  GHIJKLMNOPQR  UVWXYZ
             new EMenu("_Messages Window",
+                new EMenuItem("S_how / Restore") { public void run() {
+                    showMessagesWindow(); }},
                 new EMenuItem("_Tile with Edit Window") { public void run() {
                     MessagesWindow.tileWithEdit(); }},
                 new EMenuItem("_Save Messages...") { public void run() {
@@ -406,6 +420,10 @@ public class WindowMenu {
                     MessagesWindow.selectFont(); }}),
 
             MenuCommands.makeExtraMenu("j3d.ui.J3DMenu", true),
+
+            new EMenuItem("3D _Layer View (Modern)") {
+                public void run() { show3DLayerView(); }
+            },
 
 		// mnemonic keys available: ABCDEFGHIJK MNOPQ STUVWXYZ
             new EMenu("Side _Bar",
@@ -872,6 +890,43 @@ public class WindowMenu {
 		}
     }
 
+	private static void show3DLayerView()
+	{
+		Cell cell = WindowFrame.needCurCell();
+		if (cell == null) return;
+
+		// Check if JavaFX 3D hardware is supported
+		boolean use3D = false;
+		try
+		{
+			javafx.embed.swing.JFXPanel probe = new javafx.embed.swing.JFXPanel();
+			use3D = javafx.application.Platform.isSupported(javafx.application.ConditionalFeature.SCENE3D);
+		}
+		catch (Throwable t) { use3D = false; }
+
+		JPanel viewPanel;
+		String title;
+		if (use3D)
+		{
+			viewPanel = new com.sun.electric.plugins.j3d.View3DWindowFX(cell);
+			title = "3D Layer View (JavaFX): " + cell.noLibDescribe();
+		}
+		else
+		{
+			// Fallback: pure Java2D isometric view (no GPU needed)
+			System.out.println("JavaFX 3D not supported (no GPU), using Java2D isometric view");
+			viewPanel = new com.sun.electric.plugins.j3d.View3DLayerPanel(cell);
+			title = "3D Layer View: " + cell.noLibDescribe();
+		}
+
+		JFrame frame = new JFrame(title);
+		frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+		frame.getContentPane().add(viewPanel);
+		frame.setSize(800, 600);
+		frame.setLocationRelativeTo(null);
+		frame.setVisible(true);
+	}
+
 	private static void closeWindowCommand()
 	{
 		WindowFrame curWF = WindowFrame.getCurrentWindowFrame();
@@ -1152,4 +1207,33 @@ public class WindowMenu {
                 System.out.println("Cannot import '" + cadenceFileName + "'");
         }
     }
+
+	/**
+	 * Show/restore the Messages Window.
+	 * For docked mode: restores the split pane divider if collapsed.
+	 * For standalone mode: makes the JFrame visible and brings to front.
+	 */
+	private static void showMessagesWindow()
+	{
+		if (User.isDockMessagesWindow())
+		{
+			// Docked mode: restore the split pane divider in all windows
+			WindowFrame.restoreAllDockedMessages();
+			System.out.println("Messages window restored");
+		} else
+		{
+			// Standalone mode: make each Messages Window JFrame visible
+			for (MessagesWindow mw : MessagesWindow.getMessagesWindows())
+			{
+				mw.requestFocus();
+			}
+			// If no messages windows exist, create one
+			boolean hasAny = MessagesWindow.getMessagesWindows().iterator().hasNext();
+			if (!hasAny)
+			{
+				MessagesWindow.init();
+				System.out.println("Messages window re-created");
+			}
+		}
+	}
 }

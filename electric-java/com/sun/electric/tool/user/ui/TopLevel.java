@@ -61,6 +61,8 @@ import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
+import com.sun.electric.tool.user.ui.themes.ElectricThemeManager;
+
 /**
  * Class to define a top-level window.
  * In MDI mode (used by Windows to group multiple documents into a single window) this class is
@@ -179,7 +181,7 @@ public class TopLevel extends JFrame
 	 */
 	public static ImageIcon getFrameIcon()
 	{
-		return Resources.getResource(TopLevel.class, "IconElectric.gif");
+		return Resources.getIcon(TopLevel.class, "IconElectric");
 	}
 
     public static void InitializeMessagesWindow() {
@@ -268,25 +270,23 @@ public class TopLevel extends JFrame
             Rectangle r = gc.getBounds();
             scrnSize.setSize(r.width, r.height);
         }
-		// setup specific look-and-feel
+		// setup modern FlatLaf look-and-feel with Electric theme
         UserInterfaceMain.Mode osMode = null;
 		try{
+            // Initialize FlatLaf with Claude-inspired theme
+            ElectricThemeManager.initialize();
+
             switch (ClientOS.os)
             {
                 case WINDOWS:
                     osMode = UserInterfaceMain.Mode.MDI;
-
                     scrnSize.height -= 30;
-                    UIManager.setLookAndFeel("com.sun.java.swing.plaf.windows.WindowsLookAndFeel");
                     break;
                 case UNIX:
                     osMode = UserInterfaceMain.Mode.SDI;
-                    //UIManager.setLookAndFeel("com.sun.java.swing.plaf.motif.MotifLookAndFeel");
-                    UIManager.setLookAndFeel("com.sun.java.swing.plaf.windows.WindowsLookAndFeel");
                     break;
                 case MACINTOSH:
                     osMode = UserInterfaceMain.Mode.SDI;
-                    UIManager.setLookAndFeel("com.sun.java.swing.plaf.windows.MacLookAndFeel");
                     break;
 			}
 		} catch(Exception e) {}

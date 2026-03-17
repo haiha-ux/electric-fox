@@ -129,7 +129,7 @@ public class PaletteFrame implements MouseListener
         gridBagConstraints.gridy = 0;
         gridBagConstraints.fill = GridBagConstraints.HORIZONTAL;
         gridBagConstraints.weightx = 1.0;
-        gridBagConstraints.insets = new Insets(0, 0, 0, 0);
+        gridBagConstraints.insets = new Insets(4, 4, 2, 4);
         content.add(techSelector, gridBagConstraints);
 
         // this panel will switch between the different palettes
@@ -143,7 +143,7 @@ public class PaletteFrame implements MouseListener
         gridBagConstraints.weighty = 1.0;
         gridBagConstraints.gridwidth = 2;
         gridBagConstraints.gridheight = 2;
-        gridBagConstraints.insets = new Insets(0, 0, 0, 0);
+        gridBagConstraints.insets = new Insets(2, 4, 4, 4);
         content.add(techPalette, gridBagConstraints);
 
         techSelector.setLightWeightPopupEnabled(false);

@@ -68,7 +68,6 @@ import com.sun.electric.tool.ncc.basic.NccCellAnnotations.NamePattern;
 import com.sun.electric.tool.simulation.SimulationTool;
 import com.sun.electric.tool.user.Exec;
 import com.sun.electric.tool.user.User;
-import com.sun.electric.tool.user.dialogs.ExecDialog;
 import com.sun.electric.tool.user.ui.TopLevel;
 import com.sun.electric.util.TextUtils;
 import com.sun.electric.util.math.FixpTransform;
@@ -112,6 +111,7 @@ public class Spice extends Topology
 	/** key of Variable holding Assure templates. */		    public static final Variable.Key SPICE_A_TEMPLATE_KEY = Variable.newKey("ATTR_SPICE_template_assura");
 	/** key of Variable holding Calibre templates. */		    public static final Variable.Key SPICE_C_TEMPLATE_KEY = Variable.newKey("ATTR_SPICE_template_calibre");
 	/** key of Variable holding Ngspice templates. */		    public static final Variable.Key SPICE_NG_TEMPLATE_KEY = Variable.newKey("ATTR_SPICE_template_ngspice");
+	/** key of Variable holding simulation setup commands. */  public static final Variable.Key SPICE_SIM_SETUP_KEY = Variable.newKey("SIM_spice_setup");
 	/** key of Variable holding Spice model file. */		    public static final Variable.Key SPICE_NETLIST_FILE_KEY = Variable.newKey("ATTR_SPICE_netlist_file");
 	/** key of Variable holding SPICE code. */					public static final Variable.Key SPICE_CARD_KEY = Variable.newKey("SIM_spice_card");
 	/** key of Variable holding SPICE declaration. */			public static final Variable.Key SPICE_DECLARATION_KEY = Variable.newKey("SIM_spice_declaration");
@@ -349,9 +349,9 @@ public class Spice extends Topology
                 }
                 if (runSpice.equals(SimulationTool.spiceRunChoiceRunReportOutput))
                 {
-                    ExecDialog dialog = new ExecDialog(TopLevel.getCurrentJFrame(), false);
-                    if (runProbe) dialog.addFinishedListener(l);
-                    dialog.startProcess(command, null, dir);
+                    // Show inline progress bar instead of ExecDialog popup
+                    final String cmd = command;
+                    SpiceProgressRunner.runWithProgress(command, dir, runProbe ? l : null);
                 }
                 System.out.println("Running spice command: "+command);
             }
@@ -473,9 +473,98 @@ public class Spice extends Topology
 		if (!useCDL)
 		{
 			writeTrailer(topCell);
+			writeSimulationSetup(topCell);
             if (localPrefs.writeFinalDotEnd)
                 multiLinePrint(false, ".END\n");
 		}
+	}
+
+	/**
+	 * Write simulation setup commands stored on the cell via the SpiceSimSetup dialog.
+	 * These are stored in SPICE_NG_TEMPLATE_KEY on the top cell.
+	 */
+	private void writeSimulationSetup(Cell cell)
+	{
+		// 1. Check static field from SpiceSimSetup dialog (always in sync)
+		String setupCode = com.sun.electric.tool.user.dialogs.SpiceSimSetup.getCurrentSetupCode();
+		if (setupCode != null && !setupCode.trim().isEmpty())
+		{
+			multiLinePrint(true, "\n*** Simulation Setup ***\n");
+			for (String line : setupCode.split("\n"))
+				multiLinePrint(false, line + "\n");
+			return;
+		}
+
+		// 2. Check cell variable (persisted from previous session)
+		Variable var = cell.getVar(SPICE_SIM_SETUP_KEY);
+		if (var != null)
+		{
+			Object obj = var.getObject();
+			String[] lines = null;
+			if (obj instanceof String[])
+				lines = (String[]) obj;
+			else if (obj instanceof Object[])
+			{
+				Object[] arr = (Object[]) obj;
+				lines = new String[arr.length];
+				for (int i = 0; i < arr.length; i++)
+					lines[i] = arr[i].toString();
+			}
+			else if (obj instanceof String)
+				lines = ((String) obj).split("\n");
+			if (lines != null && lines.length > 0)
+			{
+				multiLinePrint(true, "\n*** Simulation Setup ***\n");
+				for (String line : lines)
+					multiLinePrint(false, line + "\n");
+				// Also set static field so Write & Run picks it up
+				StringBuilder sb = new StringBuilder();
+				for (String line : lines) sb.append(line).append("\n");
+				com.sun.electric.tool.user.dialogs.SpiceSimSetup.setCurrentSetupCode(sb.toString());
+				return;
+			}
+		}
+
+		// 3. Check if cell already has SPICE_CARD_KEY nodes with analysis commands
+		if (cellHasAnalysisCommands(cell)) return;
+
+		// 4. No simulation setup and no analysis commands found:
+		// Auto-add default transient analysis so ngspice produces output
+		multiLinePrint(true, "\n*** Auto-generated Simulation Setup ***\n");
+		multiLinePrint(true, "* Use Tools > Simulation (Spice) > Simulation Setup to customize\n");
+		multiLinePrint(false, "Vdd vdd gnd DC 5\n");
+		multiLinePrint(false, ".tran 1n 1u\n");
+		System.out.println("SPICE: No analysis commands found - auto-added .tran 1n 1u with Vdd=5V");
+		System.out.println("SPICE: Use Tools > Simulation (Spice) > Simulation Setup to customize");
+	}
+
+	/**
+	 * Check if the cell has any analysis commands (.tran, .dc, .ac, .op)
+	 * either in SPICE_CARD_KEY variables or in SPICE_CODE_FLAT_KEY.
+	 */
+	private boolean cellHasAnalysisCommands(Cell cell)
+	{
+		for (Iterator<NodeInst> it = cell.getNodes(); it.hasNext(); )
+		{
+			NodeInst ni = it.next();
+			Variable cardVar = ni.getVar(SPICE_CARD_KEY);
+			if (cardVar != null)
+			{
+				String cardText = cardVar.describe(-1).toLowerCase();
+				if (cardText.contains(".tran") || cardText.contains(".dc") ||
+					cardText.contains(".ac") || cardText.contains(".op"))
+					return true;
+			}
+			cardVar = ni.getVar(SPICE_CODE_FLAT_KEY);
+			if (cardVar != null)
+			{
+				String cardText = cardVar.describe(-1).toLowerCase();
+				if (cardText.contains(".tran") || cardText.contains(".dc") ||
+					cardText.contains(".ac") || cardText.contains(".op"))
+					return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -2748,7 +2837,11 @@ public class Spice extends Topology
 			}
 		}
 
-		// no header files: write predefined header for this level and technology
+		// Check for embedded models stored in the library (highest priority after header file,
+		// because user explicitly added these via SpiceModelManager)
+		if (writeEmbeddedModels()) return;
+
+		// no embedded models: write predefined header for this level and technology
 		int level = TextUtils.atoi(localPrefs.level);
 		String [] header = null;
 		switch (level)
@@ -2763,6 +2856,124 @@ public class Spice extends Topology
 				multiLinePrint(false, header[i] + "\n");
 			return;
 		}
+
+		// No header cards from file, technology, or library: write built-in models for common devices
+		writeBuiltInModels();
+	}
+
+	/**
+	 * Write SPICE models embedded in the library's SpiceModels{doc} cell.
+	 * Auto-maps model names to match Electric's default transistor model references
+	 * (N for NMOS, P for PMOS) so embedded models work without manual SPICE_MODEL_KEY setup.
+	 * @return true if embedded models were found and written
+	 */
+	private boolean writeEmbeddedModels()
+	{
+		String[] modelContents = com.sun.electric.tool.user.dialogs.SpiceModelManager.getSpiceModelsContents(
+			topCell.getLibrary());
+		if (modelContents == null || modelContents.length == 0) return false;
+
+		// Scan for NMOS/PMOS model names to auto-map to Electric's defaults (N/P)
+		String nmosModelName = null, pmosModelName = null;
+		for (String line : modelContents)
+		{
+			String trimmed = line.trim().toUpperCase();
+			if (trimmed.startsWith(".MODEL"))
+			{
+				String[] parts = trimmed.split("\\s+");
+				if (parts.length >= 3)
+				{
+					String name = parts[1];
+					String type = parts[2];
+					// Extract type without parentheses: "NMOS" or "NMOS("
+					if (type.startsWith("NMOS") && !name.equals("N"))
+						nmosModelName = line.trim().split("\\s+")[1]; // preserve original case
+					else if (type.startsWith("PMOS") && !name.equals("P"))
+						pmosModelName = line.trim().split("\\s+")[1];
+				}
+			}
+		}
+
+		multiLinePrint(true, "*** Embedded SPICE Models (from library) ***\n");
+		for (String line : modelContents)
+		{
+			String outputLine = line;
+			// Only rename model names on .MODEL declaration lines to avoid
+			// corrupting parameter names (e.g. model "P1" would break "PDIBLC1")
+			String trimmedUpper = line.trim().toUpperCase();
+			if (trimmedUpper.startsWith(".MODEL"))
+			{
+				if (nmosModelName != null && trimmedUpper.contains("NMOS"))
+					outputLine = outputLine.replace(nmosModelName, "N");
+				else if (pmosModelName != null && trimmedUpper.contains("PMOS"))
+					outputLine = outputLine.replace(pmosModelName, "P");
+			}
+			multiLinePrint(false, outputLine + "\n");
+		}
+		multiLinePrint(false, "\n");
+		String mappingInfo = "";
+		if (nmosModelName != null) mappingInfo += " (NMOS: " + nmosModelName + " -> N";
+		if (pmosModelName != null) mappingInfo += ", PMOS: " + pmosModelName + " -> P";
+		if (mappingInfo.length() > 0) mappingInfo += ")";
+		System.out.println("SPICE: Using embedded models from library '" + topCell.getLibrary().getName() + "'" + mappingInfo);
+		return true;
+	}
+
+	/**
+	 * Write built-in SPICE models for common semiconductor devices.
+	 * These provide sensible defaults so users can simulate without external model files.
+	 * Models are generic educational-level parameters suitable for basic circuit simulation.
+	 */
+	private void writeBuiltInModels()
+	{
+		multiLinePrint(true, "*** Built-in Device Models (Electric VLSI) ***\n");
+		multiLinePrint(true, "*** Replace with foundry models for production use ***\n");
+		multiLinePrint(false, "\n");
+
+		// MOSFET models (BSIM3v3 Level 49 for ngspice, Level 1 fallback)
+		boolean useNgspice = (spiceEngine == SimulationTool.SpiceEngine.SPICE_ENGINE_NG);
+		if (useNgspice)
+		{
+			// Level 1 models with reasonable parameters for ngspice
+			multiLinePrint(false, ".MODEL N NMOS LEVEL=1 VTO=0.7 KP=110U GAMMA=0.4 LAMBDA=0.04 PHI=0.65\n");
+			multiLinePrint(false, "+TOX=9E-9 CGSO=0.2N CGDO=0.2N CBD=10F CBS=10F\n");
+			multiLinePrint(false, "\n");
+			multiLinePrint(false, ".MODEL P PMOS LEVEL=1 VTO=-0.7 KP=50U GAMMA=0.57 LAMBDA=0.05 PHI=0.65\n");
+			multiLinePrint(false, "+TOX=9E-9 CGSO=0.2N CGDO=0.2N CBD=10F CBS=10F\n");
+		} else
+		{
+			multiLinePrint(false, ".MODEL N NMOS LEVEL=1 VTO=0.7 KP=110E-6 GAMMA=0.4 LAMBDA=0.04\n");
+			multiLinePrint(false, ".MODEL P PMOS LEVEL=1 VTO=-0.7 KP=50E-6 GAMMA=0.57 LAMBDA=0.05\n");
+		}
+		multiLinePrint(false, "\n");
+
+		// DMOS (Depletion MOSFET)
+		multiLinePrint(false, ".MODEL D NMOS LEVEL=1 VTO=-2.0 KP=80U LAMBDA=0.04\n");
+		multiLinePrint(false, "\n");
+
+		// BJT models
+		multiLinePrint(false, ".MODEL NBJT NPN BF=100 IS=1E-16 VAF=100 IKF=0.3\n");
+		multiLinePrint(false, "+ISE=0 NE=1.5 BR=3 ISC=0 NC=2 RB=10 RC=1 RE=0\n");
+		multiLinePrint(false, "+CJE=20F CJC=20F TF=0.4N TR=40N\n");
+		multiLinePrint(false, "\n");
+		multiLinePrint(false, ".MODEL PBJT PNP BF=50 IS=1E-16 VAF=80 IKF=0.1\n");
+		multiLinePrint(false, "+ISE=0 NE=1.5 BR=2 ISC=0 NC=2 RB=20 RC=2 RE=0\n");
+		multiLinePrint(false, "+CJE=20F CJC=20F TF=0.8N TR=60N\n");
+		multiLinePrint(false, "\n");
+
+		// JFET models
+		multiLinePrint(false, ".MODEL NJFET NJF VTO=-2.0 BETA=1.0E-4 LAMBDA=0.01 IS=1E-14\n");
+		multiLinePrint(false, "+CGS=5F CGD=1F RD=10 RS=10\n");
+		multiLinePrint(false, "\n");
+		multiLinePrint(false, ".MODEL PJFET PJF VTO=2.0 BETA=5.0E-5 LAMBDA=0.01 IS=1E-14\n");
+		multiLinePrint(false, "+CGS=5F CGD=1F RD=10 RS=10\n");
+		multiLinePrint(false, "\n");
+
+		// Diode model
+		multiLinePrint(false, ".MODEL DIFFCAP D CJO=2.0E-4 IS=1E-14 N=1.05 BV=100 RS=10\n");
+		multiLinePrint(false, "\n");
+
+		System.out.println("SPICE: Using built-in device models (replace with foundry models for production)");
 	}
 
 	/**
@@ -3380,6 +3591,119 @@ public class Spice extends Topology
                 if (cell == null) return;
             	SimulationData.plotGuessed(cell, null);
             }});
+        }
+    }
+
+    /**
+     * Runs ngspice in the background with an inline progress bar in the main window
+     * instead of a popup ExecDialog.
+     */
+    static class SpiceProgressRunner
+    {
+        private static javax.swing.JPanel progressPanel;
+        private static javax.swing.JProgressBar progressBar;
+        private static javax.swing.JLabel progressLabel;
+
+        static void runWithProgress(String command, java.io.File dir, Exec.FinishedListener finishedListener)
+        {
+            // Create inline progress bar in the main toolbar area
+            javax.swing.JFrame mainFrame = TopLevel.getCurrentJFrame();
+            if (mainFrame == null) return;
+
+            // Build progress panel
+            progressPanel = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 6, 2));
+            progressPanel.setBorder(javax.swing.BorderFactory.createCompoundBorder(
+                javax.swing.BorderFactory.createMatteBorder(0, 0, 1, 0,
+                    javax.swing.UIManager.getColor("Separator.foreground")),
+                javax.swing.BorderFactory.createEmptyBorder(2, 8, 2, 8)));
+            progressLabel = new javax.swing.JLabel("ngspice running...");
+            progressLabel.setFont(progressLabel.getFont().deriveFont(java.awt.Font.PLAIN, 11f));
+            progressBar = new javax.swing.JProgressBar();
+            progressBar.setIndeterminate(true);
+            progressBar.setPreferredSize(new java.awt.Dimension(160, 14));
+
+            javax.swing.JButton cancelBtn = new javax.swing.JButton("Cancel");
+            cancelBtn.setFont(cancelBtn.getFont().deriveFont(11f));
+            cancelBtn.putClientProperty("JButton.buttonType", "toolBarButton");
+            cancelBtn.setFocusable(false);
+
+            progressPanel.add(progressLabel);
+            progressPanel.add(progressBar);
+            progressPanel.add(cancelBtn);
+
+            // Insert progress panel between toolbar and content using a wrapper
+            java.awt.Container contentPane = mainFrame.getContentPane();
+            java.awt.Component northComp = ((java.awt.BorderLayout)contentPane.getLayout()).getLayoutComponent(java.awt.BorderLayout.NORTH);
+            javax.swing.JPanel northWrapper = new javax.swing.JPanel(new java.awt.BorderLayout());
+            if (northComp != null)
+            {
+                contentPane.remove(northComp);
+                northWrapper.add(northComp, java.awt.BorderLayout.NORTH);
+            }
+            northWrapper.add(progressPanel, java.awt.BorderLayout.SOUTH);
+            contentPane.add(northWrapper, java.awt.BorderLayout.NORTH);
+            contentPane.validate();
+            contentPane.repaint();
+
+            System.out.println("SPICE: Running " + command);
+
+            // Pipe process output to System.out (Messages Window)
+            java.io.OutputStream msgStream = new java.io.OutputStream() {
+                StringBuilder line = new StringBuilder();
+                public void write(int b) {
+                    if (b == '\n') {
+                        final String s = line.toString();
+                        line.setLength(0);
+                        SwingUtilities.invokeLater(() -> System.out.println("ngspice: " + s));
+                    } else {
+                        line.append((char)b);
+                    }
+                }
+            };
+
+            Exec exec = new Exec(command, null, dir, msgStream, msgStream);
+
+            // Cancel button stops process
+            cancelBtn.addActionListener(e -> {
+                exec.destroyProcess();
+                removeProgressPanel(mainFrame);
+                System.out.println("SPICE: Simulation cancelled");
+            });
+
+            // When finished, remove progress bar and trigger waveform load
+            exec.addFinishedListener(e -> {
+                SwingUtilities.invokeLater(() -> {
+                    removeProgressPanel(mainFrame);
+                    if (e.getExitValue() == 0)
+                        System.out.println("SPICE: Simulation completed successfully");
+                    else
+                        System.out.println("SPICE: Simulation failed (exit code " + e.getExitValue() + ")");
+                });
+            });
+
+            if (finishedListener != null)
+                exec.addFinishedListener(finishedListener);
+
+            exec.start();
+        }
+
+        private static void removeProgressPanel(javax.swing.JFrame frame)
+        {
+            if (progressPanel == null) return;
+            java.awt.Container wrapper = progressPanel.getParent();
+            if (wrapper instanceof javax.swing.JPanel)
+            {
+                // Restore the original toolbar from the wrapper
+                java.awt.Component toolbar = ((java.awt.BorderLayout)((javax.swing.JPanel)wrapper).getLayout())
+                    .getLayoutComponent(java.awt.BorderLayout.NORTH);
+                java.awt.Container contentPane = frame.getContentPane();
+                contentPane.remove(wrapper);
+                if (toolbar != null)
+                    contentPane.add(toolbar, java.awt.BorderLayout.NORTH);
+                contentPane.validate();
+                contentPane.repaint();
+            }
+            progressPanel = null;
         }
     }
 

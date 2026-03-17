@@ -2258,10 +2258,10 @@ public class User extends Listener
 	 */
 	public static boolean isFactoryCadenceMeasurementStyle() { return cacheCadenceMeasurementStyle.getBooleanFactoryValue(); }
 
-    private static Pref cacheDockMessagesWindow = Pref.makeBooleanPref("dockMessagesWindow", tool.prefs, false);
+    private static Pref cacheDockMessagesWindow = Pref.makeBooleanPref("dockMessagesWindow", tool.prefs, true);
 	/**
 	 * Method to tell whether to dock the Messages Window to each edit window
-	 * The default is "false" (existing behavior).
+	 * The default is "true" (docked to main window).
 	 */
 	public static boolean isDockMessagesWindow() { return cacheDockMessagesWindow.getBoolean(); }
 	/**

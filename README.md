@@ -1,230 +1,118 @@
-# electric
-Electric VLSI Design System
+# Electric VLSI Design System — Fox Edition
 
----------------- This is Electric, Version 9.07 ----------------
+**Version 9.08-fox** | Based on Electric 9.07/9.08 by Static Free Software
 
+Electric-Fox is a modernized fork of the [Electric VLSI Design System](http://www.staticfreesoft.com/), an open-source integrated-circuit design tool offering IC layout, schematic editing, hardware-description languages, synthesis/analysis tools, and EDA import/export. Licensed under GPLv3.
 
-Electric is written in the Java programming language and is distributed in a
-single ".jar" file.  There are two variations on the ".jar" file:
+---
 
-  With source code (called "electric-X.XX.jar")
-  
-  Without source code (called, "electricBinary-X.XX.jar").
-  
-Both of these files have the binary ".class" files needed to run Electric,
-but the one with source-code is larger because it also has all of the Java code.
+## What's New in Fox Edition
 
-Latest source code can be downloaded from Electric Home Page:
-http://savannah.gnu.org/projects/electric .
+### Java 17 Upgrade
+- Migrated from Java 1.8 target to **Java 17** (`--release 17`)
+- maven-compiler-plugin upgraded to 3.13.0
+- Fully compatible with JDK 17, 21, and later LTS releases
 
----------------- Requirements:
+### Modern 3D Layer Visualization
+- **JavaFX 3D** engine (replaces legacy Java3D 1.5.2 which is discontinued)
+- **Java2D isometric fallback** — works on systems without GPU/hardware 3D support
+- Accessible via **Window > 3D Layer View (Modern)**
+- Interactive: left-drag to rotate, right-drag to pan, scroll to zoom
 
-Electric requires OpenJDK, Apache Harmony, or Oracle Java version 1.8.
-It is developed with Oracle Java, so if you run into problems with
-other versions, try installing Java 1.8 or later from Oracle.
+### ALSE — Analog Layout Synthesis Engine
+A new module for automatic analog/mixed-signal layout generation:
+- Reads SPICE netlists or Electric schematic cells
+- Automatic transistor placement (NMOS/PMOS rows with series chain stacking)
+- Automatic routing (gate, drain, source, power/ground buses)
+- Technology-independent via `TechRules` API (DRC-aware spacing)
+- **Auto-sizing**: layout transistors inherit W/L from schematic
+- Well contact generation, guard rings, substrate taps
+- Tested with NOT, NAND2, NOR2 gates
 
----------------- Running:
+### NCC Enhancements
+- **Size checking enabled by default** — transistor W/L comparison between schematic and layout
+- **Propagate Schematic Sizes to Layout** — menu command to sync W/L (Tools > NCC)
+- **NCC + Auto-Fix Size Mismatches** — one-click NCC check and auto-correction
 
-Running Electric varies with the different platforms.  Most systems allow you
-to double-click on the .jar file. 
+### Modern UI (FlatLaf)
+- **FlatLaf 3.7** look-and-feel with light/dark theme support
+- SVG toolbar icons (scalable, resolution-independent)
+- Improved component palette, layer tab, and status bar styling
 
-If double-clicking doesn't work, try running it from the command-line by typing: 
-     java -jar electric.jar
+### Silicon Compiler Improvements
+- Gate recognition from schematic (AND, OR, NAND, NOR, NOT, XOR, MUX, DFF)
+- SPICE netlist reader for direct layout synthesis from `.spi` files
 
-An alternate command-line is: 
-     java -classpath electric.jar com.sun.electric.Launcher
+---
 
----------------- Adding Plug-Ins:
+## Build & Run
 
-Electric plug-ins are additional pieces of code that can be downloaded separately
-to enhance the system's functionality.  Currently, these plug-ins are available:
- 
-> Static Free Software extras
-  This includes the IRSIM simulator and interfaces for 3D Animation.
-  The IRSIM simulator is a gate-level simulator from Stanford University. Although
-  originally written in C, it was translated to Java so that it could plug into
-  Electric.  The Static Free Software extras is available from Static Free Software at:
-    www.staticfreesoft.com/electricSFS-X.XX.jar
+**Requirements:** JDK 17+ and Maven 3.6+
 
-> Java
-  The Bean Shell is used to do scripting and parameter evaluation in Electric.  Advanced
-  operations that make use of cell parameters will need this plug-in.  The Bean Shell is
-  available from:
-    www.beanshell.org
+```bash
+# Build (compile + package)
+mvn package
 
-> Python
-  Jython is used to do scripting in Electric.  Jython is available from:
-    www.jython.org
-  Build the "standalone" installation to get the JAR file.
+# Build skipping tests
+mvn package -DskipTests
 
-> 3D
-  The 3D facility lets you view an integrated circuit in three-dimensions. It requires
-  the Java3D package, which is available from the Java Community Site, www.j3d.org.
-  This is not a plugin, but rather an enhancement to your Java installation. 
+# Run
+java -jar target/electric-9.08-fox-jar-with-dependencies.jar
 
-> Animation
-  Another extra that can be added to the 3D facility is 3D animation.  This requires
-  the Java Media Framework (JMF) and extra animation code.  The Java Media Framework is
-  available from Oracle (this is not a plugin: it is an enhancement to your Java installation).
+# Run with larger heap (for large designs)
+java -Xmx2g -jar target/electric-9.08-fox-jar-with-dependencies.jar
 
-> Russian User's Manual
-  An earlier version of the user's manual (8.02) has been translated into Russian.
-  This manual is available from Static Free Software at:
-    www.staticfreesoft.com/electricRussianManual-X.XX.jar
+# Run tests
+mvn test
+```
 
-To attach a plugin, it must be in the CLASSPATH.  The simplest way to do that is to
-invoked Electric from the command line, and specify the classpath.  For example, to
-add the beanshell (a file named "bsh-2.0b1.jar"), type: 
-    java -classpath electric.jar:bsh-2.0b1.jar com.sun.electric.Launcher
+## Source Layout
 
-On Windows, you must use the ";" to separate jar files, and you might also have to
-quote the collection since ";" separates commands:
-    java -classpath "electric.jar;bsh-2.0b1.jar" com.sun.electric.Launcher
+```
+electric-java/          Main Java sources
+  com/sun/electric/
+    database/           Core data model (immutable cells, snapshots, geometry)
+    technology/         Technology definitions (MOCMOS, CMOS, etc.)
+    tool/
+      drc/              Design Rule Checking
+      erc/              Electrical Rule Checking
+      ncc/              Network Consistency Checking
+      simulation/       Circuit simulation interfaces
+      routing/          Auto-routing
+      placement/        Cell placement
+      sc/               Silicon compiler + ALSE
+      io/               File I/O (SPICE, GDS, CIF, LEF/DEF, EDIF...)
+      user/             User interface, preferences, menus
+    plugins/
+      j3d/              3D visualization (JavaFX + Java2D fallback)
+test/                   JUnit 4 test sources
+packaging/              Ant build, platform packaging
+```
 
-Note that you must explicitly mention the main Electric class (com.sun.electric.Launcher)
-when using plug-ins since all of the jar files are grouped together as the "classpath".
+## Key Dependencies
 
----------------- Building from Sources:
+| Library | Version | Purpose |
+|---------|---------|---------|
+| FlatLaf | 3.7 | Modern Swing look-and-feel |
+| JavaFX | 17.0.13 | 3D visualization |
+| BeanShell | 2.0b4 | Java scripting |
+| Jython | 2.7.0 | Python scripting |
+| JUnit | 4.10 | Testing |
+| SLF4J | 1.7.7 | Logging |
 
-Extract the source ".jar" file.  It will contain the subdirectory "com" with all
-source code.  The file "build.xml" has the Ant scripts for compiling this code.
+## Screenshots
 
-When rebuilding Electric, there are some Macintosh vs. non-Macintosh issues to consider:
+Open a layout cell and explore:
+- **Tools > NCC** — Network Consistency Checking with size verification
+- **Tools > Silicon Compiler > Synthesize Layout (ALSE)** — Automatic analog layout
+- **Window > 3D Layer View (Modern)** — 3D/isometric layer stack visualization
 
-> Build on a Macintosh
-  The easiest thing to do is to remove references to "AppleJavaExtensions.jar"
-  from the Ant script (build.xml).  This package is a collection of "stubs" to
-  replace Macintosh functions that are unavailable elsewhere.  You can also build
-  a native "App" by running the "mac-app" Ant script.  This script makes use of files
-  in the "packaging" folder.  Macintosh computers must be running OS 10.3 or later. 
+## Credits
 
-> Build on non-Macintosh
-  If you are building Electric on and for a non-Macintosh platform, remove references
-  to "AppleJavaExtensions.jar" from the Ant script (build.xml).  Also, remove the module
-  "com.sun.electric.MacOSXInterface.java".  It is sufficient to delete this module,
-  because Electric automatically detects its presence and is able to run without it.
+- **Electric VLSI Design System** by Static Free Software — [staticfreesoft.com](http://www.staticfreesoft.com/)
+- **Fox Edition** enhancements developed with [Claude Code](https://claude.ai/claude-code)
+- Original source: [GNU Savannah](http://savannah.gnu.org/projects/electric)
 
-> Build on non-Macintosh, to run on all platforms
-  To build Electric so that it can run on all platforms, Macintosh and other, you will
-  need to keep the module "com.sun.electric.MacOSXInterface.java".  However, in order
-  to build it, you will need the stub package "AppleJavaExtensions.jar".  The package
-  can be downloaded from Apple at
-    http://developer.apple.com/samplecode/AppleJavaExtensions/index.html.
+## License
 
----------------- Building from Sources hosted on savannah.gnu.org in NetBeans IDE
-
-1) Start NetBeans 7.0 or later.
-2) Install the Team Server Plugin:
-
-   2.1) Use Tools / Plugins and choose the "Available Plugins" tab in the Plugins manager.
-   
-   2.2) In the left pane, check the "Team Server" plugin and click "Install".
-   
-   2.3) Click "Close" to exit the Plugins manager.
-   
-   2.4) Use Window / Services to open the "Services" tab
-   
-   2.5) Expand the "Team Server" node and check that the "savannah.gnu.org" Team Server is listed.
-   
-3) Download Electric Sources from savannah.gnu.org .
-
-   3.1) Choose File / Open Team Project... from the main menu.
-   
-   3.2) Search for electric project
-   
-   3.3) Select "Electric: VLSI Design System" and click Open From Team Server
-   
-   3.4) Expand "Electric: VLSI Design System" node in the Team tab
-   
-   3.5) Expand Sources subnode
-   
-   3.6) Click "Source Code Repository (get)"
-   
-   3.6) Either enter "Folder To Get" in "Get Sources From Team Server" dialog or click "Browse" button near it.
-   
-        The "Folder to Get" of Electric-X.XX is "tags/electric-X.XX" .
-        
-        The "Folder to Get" of latest Electric sources is "trunk/electric" .
-        
-   3.7) Choose "Local Folder" in "Get Sources From Team Server" where to download Electric Sources.
-   
-        The default is "~/NetBeansProjects/electric~svn".
-        
-   3.8) Click "Get From Team Server"
-   
-   3.9) The "Checkout Completed" dialog will say that project "electric" was checkout.
-   
-        It will suggest you to open a project.
-        
-   3.10) Click "Open Project..."
-   
-   3.11) Choose "electric" and click "Open".
-   
-4) Build Electric
-
-   4.1) Right-click "electric" node in "Projects" tab.
-   
-   4.2) Choose "Build".
-   
-   Electric project is large. If build hangs then it may be necessary to add "-J-Xmx2g" to netbeans_default_options
-   
-   in file <NETBEANS_INSTALLATION>/etc/netbeans.conf .
-   
-5) Run Electric.
-
-   5.1) Choose either "Run > Run Project (electric)" or "Debug > Debug Project (electric)" from the main menu.
-   
-6) Create electric distribution for your organization (optional).
-
-   6.1) Right-click at the Electric project icon. Choose "Properties|Configuration|release-profile"
-   
-   6.2) Choose "Build|Clean and build main project".
-   
-   6.3) Copy ~/NetBeansProjects/electric~svn/electric/target/electric-9.04-a-with-dependencies.jar to a shared location
-   
-        in your file system.
-
----------------- Building from latest Sources in command-line:
-
-1) Check that these tools are installed on your computer:
-   JDK 1.8 or later
-   Subversion
-   Apache Ant version 1.8.0 or later (http://ant.apache.org)
-
-   The following variable should be defined in your environment:
-      JAVA_PATH - path to the JDK root directory
-
-2) Obtain the latest sources using Subversion
-   a) For the first time
-      cd WORK-DIRECTORY
-      svn checkout http://svn.savannah.gnu.org/svn/electric
-      cd electric
-   b) Next time
-      cd WORK-DIRECTORY/electric
-      svn update
-
-3) Compile sources
-   cd packaging
-   ant
-
-4) Run the Electric
-   java -jar WORK-DIRECTORY/electric/packaging/electricPublic-X.XX.jar
-
-   You might execute Electric with larger heap size if your design is large.
-      java -Xmx2g -jar WORK-DIRECTORY/electric/packaging/electricPublic-X.XX.jar
-
----------------- Discussion:
-
-There are three mailing lists devoted to Electric:
-
-> google groups "electricvlsi"
-  View at: http://groups.google.com/group/electricvlsi
-
-> bug-gnu-electric
-  Subscribe at http://mail.gnu.org/mailman/listinfo/bug-gnu-electric
-
-> discuss-gnu-electric
-  Subscribe at http://mail.gnu.org/mailman/listinfo/discuss-gnu-electric
-
-In addition, you can send mail to:
-info@staticfreesoft.com
+GNU General Public License v3.0 — see [COPYING](COPYING) for details.

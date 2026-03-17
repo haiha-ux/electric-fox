@@ -45,6 +45,7 @@ import com.sun.electric.tool.project.HistoryDialog;
 import com.sun.electric.tool.project.Project;
 import com.sun.electric.tool.project.UpdateJob;
 import com.sun.electric.tool.simulation.Signal;
+import com.sun.electric.tool.simulation.SignalCollection;
 import com.sun.electric.tool.user.CellChangeJobs;
 import com.sun.electric.tool.user.CircuitChangeJobs;
 import com.sun.electric.tool.user.CircuitChanges;
@@ -213,6 +214,62 @@ public class ExplorerTree extends JTree implements DragSourceListener // , DragG
         handler = new TreeHandler(this);
 		addMouseListener(handler);
 		addTreeSelectionListener(handler);
+	}
+
+	/**
+	 * Filter the tree to show only signal nodes matching the given text.
+	 * Empty text clears the filter and shows all nodes.
+	 */
+	public void setSignalFilter(String filterText)
+	{
+		if (filterText == null || filterText.isEmpty())
+		{
+			// clear filter: collapse all content nodes
+			clearSelection();
+			int row = getRowCount() - 1;
+			while (row > 0) { collapseRow(row); row--; }
+			return;
+		}
+
+		// expand all nodes and select matching signals
+		List<TreePath> matchingPaths = new ArrayList<TreePath>();
+		DefaultMutableTreeNode root = (DefaultMutableTreeNode)getModel().getRoot();
+		expandAndMatch(root, new TreePath(root), filterText, matchingPaths);
+
+		if (matchingPaths.size() > 0)
+		{
+			TreePath[] paths = matchingPaths.toArray(new TreePath[0]);
+			setSelectionPaths(paths);
+			scrollPathToVisible(paths[0]);
+		} else {
+			clearSelection();
+		}
+	}
+
+	private void expandAndMatch(DefaultMutableTreeNode node, TreePath path, String filter, List<TreePath> matches)
+	{
+		boolean hasMatchingChild = false;
+		for (int i = 0; i < node.getChildCount(); i++)
+		{
+			DefaultMutableTreeNode child = (DefaultMutableTreeNode)node.getChildAt(i);
+			TreePath childPath = path.pathByAddingChild(child);
+			Object userObj = child.getUserObject();
+
+			if (child.isLeaf())
+			{
+				String name = userObj != null ? userObj.toString().toLowerCase() : "";
+				if (name.contains(filter))
+				{
+					matches.add(childPath);
+					hasMatchingChild = true;
+				}
+			} else {
+				expandAndMatch(child, childPath, filter, matches);
+				hasMatchingChild = true;
+			}
+		}
+		if (hasMatchingChild && node != (DefaultMutableTreeNode)getModel().getRoot())
+			expandPath(path);
 	}
 
 	/**
@@ -759,13 +816,13 @@ public class ExplorerTree extends JTree implements DragSourceListener // , DragG
 			{
 				nodeName += " [Current]";
                 if (iconLibraryChecked == null)
-				    iconLibraryChecked = Resources.getResource(getClass(), "IconLibraryCheck.gif");
+				    iconLibraryChecked = Resources.getIcon(getClass(), "IconLibraryCheck");
                 iconLibrary = iconLibraryChecked;
 			}
 			else
 			{
                 if (iconLibraryNormal == null)
-				    iconLibraryNormal = Resources.getResource(getClass(), "IconLibrary.gif");
+				    iconLibraryNormal = Resources.getIcon(getClass(), "IconLibrary");
                 iconLibrary = iconLibraryNormal;
 			}
 			return nodeName;
@@ -1267,7 +1324,7 @@ public class ExplorerTree extends JTree implements DragSourceListener // , DragG
 			{
 				Library lib = (Library)nodeInfo;
 				if (iconLibraryNormal == null)
-					iconLibraryNormal = Resources.getResource(getClass(), "IconLibrary.gif");
+					iconLibraryNormal = Resources.getIcon(getClass(), "IconLibrary");
                 if (iconLibrary == null)
                     iconLibrary = iconLibraryNormal;
 				if (lib.isChanged()) setFont(boldFont);
@@ -1306,7 +1363,7 @@ public class ExplorerTree extends JTree implements DragSourceListener // , DragG
 			if (nodeInfo instanceof ExplorerTreeModel.MultiPageCell)
 			{
 				if (iconViewMultiPageSchematics == null)
-					iconViewMultiPageSchematics = Resources.getResource(getClass(), "IconViewMultiPageSchematics.gif");
+					iconViewMultiPageSchematics = Resources.getIcon(getClass(), "IconViewMultiPageSchematics");
 				setIcon(iconViewMultiPageSchematics);
 			}
 			if (nodeInfo instanceof Cell.CellGroup)
@@ -1325,7 +1382,7 @@ public class ExplorerTree extends JTree implements DragSourceListener // , DragG
                 if (changed) setFont(boldFont);
                 if (CVS.isEnabled()) setForeground(CVSLibrary.getColor(cg));
 				if (iconGroup == null)
-					iconGroup = Resources.getResource(getClass(), "IconGroup.gif");
+					iconGroup = Resources.getIcon(getClass(), "IconGroup");
 				setIcon(iconGroup);
 			}
 			if (nodeInfo instanceof String)
@@ -1334,34 +1391,34 @@ public class ExplorerTree extends JTree implements DragSourceListener // , DragG
 				if (theString.equalsIgnoreCase("jobs"))
 				{
 					if (iconJobs == null)
-						iconJobs = Resources.getResource(getClass(), "IconJobs.gif");
+						iconJobs = Resources.getIcon(getClass(), "IconJobs");
 					setIcon(iconJobs);
 				} else if (theString.equalsIgnoreCase("libraries"))
 				{
 					if (iconLibraries == null)
-						iconLibraries = Resources.getResource(getClass(), "IconLibraries.gif");
+						iconLibraries = Resources.getIcon(getClass(), "IconLibraries");
 					setIcon(iconLibraries);
 				} else if (theString.equalsIgnoreCase("errors"))
 				{
 					if (iconErrors == null)
-						iconErrors = Resources.getResource(getClass(), "IconErrors.gif");
+						iconErrors = Resources.getIcon(getClass(), "IconErrors");
 					setIcon(iconErrors);
 				} else if (theString.equalsIgnoreCase("signals") || theString.equalsIgnoreCase("trans signals") ||
 					theString.equalsIgnoreCase("ac signals") || theString.equalsIgnoreCase("dc signals"))
 				{
 					if (iconSignals == null)
-						iconSignals = Resources.getResource(getClass(), "IconSignals.gif");
+						iconSignals = Resources.getIcon(getClass(), "IconSignals");
 					setIcon(iconSignals);
 				} else if (theString.equalsIgnoreCase("sweeps") || theString.equalsIgnoreCase("trans sweeps") ||
 					theString.equalsIgnoreCase("ac sweeps") || theString.equalsIgnoreCase("dc sweeps"))
 				{
 					if (iconSweeps == null)
-						iconSweeps = Resources.getResource(getClass(), "IconSweeps.gif");
+						iconSweeps = Resources.getIcon(getClass(), "IconSweeps");
 					setIcon(iconSweeps);
 				} else if (theString.equalsIgnoreCase("measurements"))
 				{
 					if (iconMeasurements == null)
-						iconMeasurements = Resources.getResource(getClass(), "IconMeasurement.gif");
+						iconMeasurements = Resources.getIcon(getClass(), "IconMeasurement");
 					setIcon(iconMeasurements);
 				}
 			}
@@ -1372,12 +1429,12 @@ public class ExplorerTree extends JTree implements DragSourceListener // , DragG
                 if (theLog instanceof ErrorLogger.WarningLog)
                 {
                     if (iconWarnMsg == null)
-                        iconWarnMsg = Resources.getResource(getClass(), "IconWarningLog.gif");
+                        iconWarnMsg = Resources.getIcon(getClass(), "IconWarningLog");
                     setIcon(iconWarnMsg);
                 } else // warning
                 {
                     if (iconErrorMsg == null)
-                        iconErrorMsg = Resources.getResource(getClass(), "IconErrorLog.gif");
+                        iconErrorMsg = Resources.getIcon(getClass(), "IconErrorLog");
                     setIcon(iconErrorMsg);
                 }
             }
@@ -1400,17 +1457,17 @@ public class ExplorerTree extends JTree implements DragSourceListener // , DragG
 				ig = new IconGroup();
 
 				// get the appropriate background icon
-				if (view == View.LAYOUT) ig.regular = Resources.getResource(getClass(), "IconViewLayout.gif"); else
-				if (view == View.SCHEMATIC) ig.regular = Resources.getResource(getClass(), "IconViewSchematics.gif"); else
-				if (view == View.ICON) ig.regular = Resources.getResource(getClass(), "IconViewIcon.gif"); else
-				if (view == View.DOC) ig.regular = Resources.getResource(getClass(), "IconViewText.gif"); else
-				ig.regular = Resources.getResource(getClass(), "IconViewMisc.gif");
+				if (view == View.LAYOUT) ig.regular = Resources.getIcon(getClass(), "IconViewLayout"); else
+				if (view == View.SCHEMATIC) ig.regular = Resources.getIcon(getClass(), "IconViewSchematics"); else
+				if (view == View.ICON) ig.regular = Resources.getIcon(getClass(), "IconViewIcon"); else
+				if (view == View.DOC) ig.regular = Resources.getIcon(getClass(), "IconViewText"); else
+				ig.regular = Resources.getIcon(getClass(), "IconViewMisc");
 
 				// make sure the overlay icons have been read
-				if (iconSpiderWeb == null) iconSpiderWeb = Resources.getResource(getClass(), "IconSpiderWeb.gif");
-				if (iconLocked == null) iconLocked = Resources.getResource(getClass(), "IconLocked.gif");
-				if (iconUnlocked == null) iconUnlocked = Resources.getResource(getClass(), "IconUnlocked.gif");
-				if (iconAvailable == null) iconAvailable = Resources.getResource(getClass(), "IconAvailable.gif");
+				if (iconSpiderWeb == null) iconSpiderWeb = Resources.getIcon(getClass(), "IconSpiderWeb");
+				if (iconLocked == null) iconLocked = Resources.getIcon(getClass(), "IconLocked");
+				if (iconUnlocked == null) iconUnlocked = Resources.getIcon(getClass(), "IconUnlocked");
+				if (iconAvailable == null) iconAvailable = Resources.getIcon(getClass(), "IconAvailable");
 
 				ig.old = buildIcon(iconSpiderWeb, ig.regular);
 				ig.available = buildIcon(iconAvailable, ig.regular);
@@ -1892,6 +1949,15 @@ public class ExplorerTree extends JTree implements DragSourceListener // , DragG
 				menuItem.addActionListener((ActionEvent e) ->
                 {
                     addToWaveform(true);
+                });
+
+				menu.addSeparator();
+
+				menuItem = new JMenuItem("Add All Signals to Waveform");
+				menu.add(menuItem);
+				menuItem.addActionListener((ActionEvent e) ->
+                {
+                    addAllSignalsToWaveform();
                 });
 
 				menu.addSeparator();
@@ -2974,6 +3040,24 @@ public class ExplorerTree extends JTree implements DragSourceListener // , DragG
 				sigs.add(sig);
 			}
 			ww.showSignals(sigs, newPanel);
+		}
+
+		private void addAllSignalsToWaveform()
+		{
+			WindowFrame wf = WindowFrame.getCurrentWindowFrame();
+			if (!(wf.getContent() instanceof WaveformWindow)) return;
+			WaveformWindow ww = (WaveformWindow)wf.getContent();
+			// get the signal collection from the first selected signal
+			if (numCurrentlySelectedObjects() == 0) return;
+			Object obj = getCurrentlySelectedObject(0);
+			if (!(obj instanceof Signal<?>)) return;
+			Signal<?> firstSig = (Signal<?>)obj;
+			SignalCollection sc = firstSig.getSignalCollection();
+			if (sc == null) return;
+			List<Signal<?>> allSigs = new ArrayList<Signal<?>>();
+			for (Signal<?> sig : sc.getSignals())
+				allSigs.add(sig);
+			ww.showSignals(allSigs, true);
 		}
 
 		private void setSweepAction(boolean include)

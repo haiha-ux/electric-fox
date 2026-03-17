@@ -55,7 +55,7 @@ public class JobTree extends DefaultMutableTreeNode {
 
     private JobTree() {
         super(jobNodeName);
-        children = jobNodes;
+        children = (Vector)jobNodes;
     }
 
     /** Build Job explorer tree */

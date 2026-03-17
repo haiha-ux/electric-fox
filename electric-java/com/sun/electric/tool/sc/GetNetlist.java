@@ -493,6 +493,7 @@ public class GetNetlist
 	private String connect(List<String> keywords)
 	{
 		if (keywords.size() < 4) return "Not enough parameters for CONNECT command";
+		if (curSCCell == null) return "No cell selected for CONNECT command";
 
 		// search for the first node
 		String node0Name = keywords.get(1);
@@ -675,6 +676,7 @@ public class GetNetlist
 
 		if (whatToSet.equalsIgnoreCase("leaf-cell-numbers"))
 		{
+			if (keywords.size() <= 2) return "No cell name for SET LEAF-CELL-NUMBERS command";
 			String cellName = keywords.get(2);
 			Cell leafCell = findLeafCell(cellName);
 			if (leafCell == null) return "Cannot find cell '" + cellName + "'";
@@ -720,7 +722,8 @@ public class GetNetlist
 		if (whatToSet.equalsIgnoreCase("node-name"))
 		{
 			// check for sufficient parameters
-			if (keywords.size() <= 4) return "Insufficent parameters for SET NODE-NAME command";
+			if (keywords.size() <= 4) return "Insufficient parameters for SET NODE-NAME command";
+			if (curSCCell == null) return "No cell selected for SET NODE-NAME command";
 
 			// search for instance
 			String instName = keywords.get(2);
@@ -754,6 +757,7 @@ public class GetNetlist
 
 		if (whatToSet.equalsIgnoreCase("port-direction"))
 		{
+			if (keywords.size() <= 4) return "Insufficient parameters for SET PORT-DIRECTION command";
 			String cellName = keywords.get(2);
 			String portName = keywords.get(3);
 			SCCell cell;
@@ -761,25 +765,24 @@ public class GetNetlist
 			{
 				if (cell.name.equalsIgnoreCase(cellName)) break;
 			}
-			int bits = 0;
 			if (cell == null)
 			{
 				Cell leafCell = findLeafCell(cellName);
 				if (leafCell == null)
 					return "Cannot find cell '" + cellName + "'";
 				Export leafPort = leafCell.findExport(portName);
-				if (leafPort  == null) return "Cannot find port '" + portName + "' on cell '" + cellName + "'";
-			} else
-			{
-				SCPort port;
-				for (port = cell.ports; port != null; port = port.next)
-				{
-					if (port.name.equalsIgnoreCase(portName)) break;
-				}
-				if (port == null)
-					return "Cannot find port '" + portName + "' on cell '" + cellName + "'";
-				bits = port.bits;
+				if (leafPort == null) return "Cannot find port '" + portName + "' on cell '" + cellName + "'";
+				// leaf cell port direction not currently modifiable
+				return null;
 			}
+			SCPort port;
+			for (port = cell.ports; port != null; port = port.next)
+			{
+				if (port.name.equalsIgnoreCase(portName)) break;
+			}
+			if (port == null)
+				return "Cannot find port '" + portName + "' on cell '" + cellName + "'";
+			int bits = port.bits;
 			bits &= ~PORTDIRMASK;
 			String dir = keywords.get(4);
 			for(int i=0; i<dir.length(); i++)
@@ -795,6 +798,7 @@ public class GetNetlist
 						return "Unknown port direction specifier '" + dir + "'";
 				}
 			}
+			port.bits = bits;
 			return null;
 		}
 		return "Unknown option '" + whatToSet+ "' for SET command";

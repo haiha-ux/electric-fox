@@ -38,7 +38,7 @@ public class Place
 {
 	/** for debugging output */				private static final boolean DEBUG = false;
 	/** TRUE = sort cluster tree */			private static final boolean SORTFLAG = true;
-	/** TRUE = do net balance */			private static final boolean BALANCEFLAG = false;
+	/** TRUE = do net balance */			private static final boolean BALANCEFLAG = true;
 	/** limit of movement */				private static final int     BALANCELIMIT = 2;
 	/** scaling factor */					private static final int     VERTICALCOST = 2;
 
@@ -167,12 +167,12 @@ public class Place
 		int numCl = clusters.size();
 		if (numCl == 0)
 		{
-			System.out.println("ERROR - No cells found to place.  Aborting.");
-			return null;
+			return "No cells found to place";
 		}
 
 		// if there are fewer cells than rows, decrease the number of rows
 		if (numCl < place.numRows) place.numRows = numCl;
+		if (place.numRows <= 0) place.numRows = 1;
 
 		// create a cluster tree node for each cluster
 		ClusterTree nStart = null;
@@ -239,8 +239,18 @@ public class Place
 			}
 		}
 
-		// print process time for placement
 		reorderRows(gnl.curSCCell.placement.theRows);
+
+		// report placement statistics
+		int totalCells = 0;
+		for (RowList r : gnl.curSCCell.placement.theRows) {
+			int count = 0;
+			for (NBPlace p = r.start; p != null; p = p.next) count++;
+			totalCells += count;
+		}
+		System.out.println("  Placed " + totalCells + " cells in " +
+			gnl.curSCCell.placement.theRows.size() + " rows" +
+			(BALANCEFLAG ? " (with net balancing)" : ""));
 
 		return null;
 	}

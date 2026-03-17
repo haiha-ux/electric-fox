@@ -134,7 +134,7 @@ public class MessagesWindow
 
 		info = new JTextArea(20, 110);
 		info.setLineWrap(false);
-		info.setFont(new Font("Monospaced", 0, 12));
+		info.setFont(new Font("Monospaced", Font.PLAIN, 13));
 		info.addMouseListener(this);
 		JScrollPane scrollPane = new JScrollPane(info,
 			JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,

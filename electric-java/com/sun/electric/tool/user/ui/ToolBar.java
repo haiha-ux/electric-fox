@@ -75,7 +75,7 @@ import javax.swing.*;
  */
 public class ToolBar extends JToolBar
 {
-	private static ImageIcon unknownIcon = Resources.getResource(ToolBar.class, "ButtonUnknown.gif");
+	private static ImageIcon unknownIcon = Resources.getIcon(ToolBar.class, "ButtonUnknown");
 	private static EToolBarButton[] currentToolbarButtons;
 	private static List<EToolBarButton> allButtons = new ArrayList<EToolBarButton>();
 	private static Map<String,String> commandToIconMap;
@@ -558,7 +558,7 @@ public class ToolBar extends JToolBar
 			this.iconName = iconName;
 			this.menuName = menuName;
 			if (iconName == null) this.defaultIcon = unknownIcon; else
-				this.defaultIcon = Resources.getResource(ToolBar.class, iconName + ".gif");
+				this.defaultIcon = Resources.getIcon(ToolBar.class, iconName);
 		}
 
 		/**
@@ -573,7 +573,7 @@ public class ToolBar extends JToolBar
 			this.iconName = iconName;
 			this.menuName = menuName;
 			if (iconName == null) this.defaultIcon = unknownIcon; else
-				this.defaultIcon = Resources.getResource(ToolBar.class, iconName + ".gif");
+				this.defaultIcon = Resources.getIcon(ToolBar.class, iconName);
 		}
 
 		/**
@@ -1084,8 +1084,8 @@ public class ToolBar extends JToolBar
 		changeCursorMode(curMode);
 	}
 
-	private static final ImageIcon selectSpecialIconOn = Resources.getResource(ToolBar.class, "ButtonSelectSpecialOn.gif");
-	private static final ImageIcon selectSpecialIconOff = Resources.getResource(ToolBar.class, "ButtonSelectSpecialOff.gif");
+	private static final ImageIcon selectSpecialIconOn = Resources.getIcon(ToolBar.class, "ButtonSelectSpecialOn");
+	private static final ImageIcon selectSpecialIconOff = Resources.getIcon(ToolBar.class, "ButtonSelectSpecialOff");
 
 	private static EToolBarButton toggleSelectSpecialCommand = new EToolBarButton("Toggle Special Select", null, "ButtonSelectSpecialOff",
 		"Edit:Modes:Select")

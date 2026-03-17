@@ -31,7 +31,7 @@
 
     <groupId>com.staticfreesoft</groupId>
     <artifactId>electric</artifactId>
-    <version>9.08-a-SNAPSHOT</version>
+    <version>9.08-fox</version>
     <packaging>jar</packaging>
 
     <name>electric</name>
@@ -60,6 +60,7 @@
         <junitVersion>4.10</junitVersion>
         <orgSlf4jVersion>1.7.7</orgSlf4jVersion>
         <scala.version>2.11.7</scala.version>
+        <flatlafVersion>3.7</flatlafVersion>
     </properties>
 
     <scm>
@@ -83,15 +84,27 @@
             <!--scope>provided</scope-->
         </dependency>
         <dependency>
-            <!--
-            This is an old version of java3d library that was found in public
-            maven repositories. It is enough for compilation, but this may be too slow.
-            User should install the latest version of java3d library if he wants to faster
-            Electric 3D graphic. -->
+            <!-- Old Java3D - kept as provided for legacy plugin compilation -->
             <groupId>java3d</groupId>
             <artifactId>j3d-core-utils</artifactId>
             <version>${java3dVersion}</version>
             <scope>provided</scope>
+        </dependency>
+        <!-- JavaFX 3D (modern replacement for Java3D) -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>17.0.13</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>17.0.13</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-swing</artifactId>
+            <version>17.0.13</version>
         </dependency>
         <!-- Language Interpreters -->
         <dependency>
@@ -113,6 +126,17 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-jdk14</artifactId>
             <version>${orgSlf4jVersion}</version>
+        </dependency>
+        <!-- Modern Look and Feel -->
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>${flatlafVersion}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf-extras</artifactId>
+            <version>${flatlafVersion}</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
@@ -153,16 +177,16 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.3</version>
+                <version>3.13.0</version>
                 <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
+                    <release>17</release>
                     <showDeprecation>true</showDeprecation>
                     <compilerArgs>
                         <arg>-Xlint:unchecked</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>
+            <!-- Scala plugin disabled: incompatible with Java 21+
             <plugin>
                 <groupId>org.scala-tools</groupId>
                 <artifactId>maven-scala-plugin</artifactId>
@@ -171,7 +195,6 @@
                     <execution>
                         <goals>
                             <goal>compile</goal>
-                            <!--goal>testCompile</goal-->
                         </goals>
                     </execution>
                 </executions>
@@ -182,6 +205,7 @@
                     </includes>
                 </configuration>
             </plugin>
+            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -211,6 +235,9 @@
                         <manifest>
                             <mainClass>com.sun.electric.Launcher</mainClass>
                         </manifest>
+                        <manifestEntries>
+                            <Multi-Release>true</Multi-Release>
+                        </manifestEntries>
                     </archive>
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>

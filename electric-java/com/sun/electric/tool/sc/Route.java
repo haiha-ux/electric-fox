@@ -247,6 +247,16 @@ public class Route
 		// route tracks in each channel
 		tracksInChannels(channelList, gnl.curSCCell);
 
+		// report routing statistics
+		int numChannels = 0, totalTracks = 0;
+		for (RouteChannel ch = channelList; ch != null; ch = ch.next) {
+			numChannels++;
+			for (RouteTrack tr = ch.tracks; tr != null; tr = tr.next) totalTracks++;
+		}
+		int numExports = 0;
+		for (RouteExport ex = route.exports; ex != null; ex = ex.next) numExports++;
+		System.out.println("  Routed " + numChannels + " channels, " + totalTracks + " tracks, " + numExports + " exports");
+
 		return null;
 	}
 

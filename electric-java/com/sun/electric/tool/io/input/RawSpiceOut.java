@@ -66,13 +66,9 @@ public class RawSpiceOut extends Input<Stimuli>
 
 		// show progress reading .raw file
 		System.out.println("Reading Spice3/NGSpice/LTSpice/SmartSpice raw output file: " + fileURL.getFile());
-		startProgressDialog("LTSpice output", fileURL.getFile());
 
 		// read the actual signal data from the .raw file
 		sd = readRawSpice3File(cell, sd);
-
-		// stop progress dialog, close the file
-		stopProgressDialog();
 		closeInput();
         return sd;
 	}
@@ -292,6 +288,8 @@ public class RawSpiceOut extends Input<Stimuli>
                             }
                         }
                     }
+                    if (sc == null)
+                        sc = Stimuli.newSignalCollection(sd, "TRANS SIGNALS");
                     for (int i = 0; i < signalCount; i++)
                         ScalarSample.createSignal(sc, sd, signalNames[i], null, time, values[i]);
                     continue;
@@ -322,6 +320,8 @@ public class RawSpiceOut extends Input<Stimuli>
                         for(int i=0; i<signalCount; i++)
                             values[i][j] = getNextDouble();
                     }
+                    if (sc == null)
+                        sc = Stimuli.newSignalCollection(sd, "TRANS SIGNALS");
                     for (int i = 0; i < signalCount; i++)
                         ScalarSample.createSignal(sc, sd, signalNames[i], null, time, values[i]);
                     continue;
@@ -431,6 +431,8 @@ if (OLD) continue;
                         }
                     }
                     if (DEBUG) System.out.println("FOUND " + sweepCount + " SWEEPS");
+                    if (sc == null)
+                        sc = Stimuli.newSignalCollection(sd, "TRANS SIGNALS");
                     Signal<?> [][] signals = new Signal<?>[signalCount][sweepCount];
                 	for(int i=0; i<signalCount; i++)
                     {

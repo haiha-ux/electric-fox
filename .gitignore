@@ -1,0 +1,15 @@
+target/
+*.class
+*.jar
+*.log
+*.raw
+*.spi
+*.jelib
+.idea/
+*.iml
+.settings/
+.project
+.classpath
+META-INF/
+electric.log
+b3v3_1check.log

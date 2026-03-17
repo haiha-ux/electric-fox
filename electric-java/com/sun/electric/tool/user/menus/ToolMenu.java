@@ -105,6 +105,7 @@ import com.sun.electric.tool.ncc.NccJob;
 import com.sun.electric.tool.ncc.NccOptions;
 import com.sun.electric.tool.ncc.PassedNcc;
 import com.sun.electric.tool.ncc.SchemNamesToLay;
+import com.sun.electric.tool.ncc.SchemSizesToLay;
 import com.sun.electric.tool.ncc.basic.NccCellAnnotations;
 import com.sun.electric.tool.ncc.basic.NccUtils;
 import com.sun.electric.tool.ncc.netlist.NccNetlist;
@@ -334,6 +335,14 @@ public class ToolMenu {
 			// ------------------- Simulation (SPICE)
 			// mnemonic keys available: B  JK QR VWXYZ
 			new EMenu("Simulation (_Spice)",
+				new EMenuItem("_Simulation Setup && Run...") {
+					public void run() {
+						com.sun.electric.tool.user.dialogs.SpiceSimSetup.togglePanel();
+					}
+				},
+
+				SEPARATOR,
+
 				new EMenuItem("Write Spice _Deck...") {
 					public void run() { FileMenu.exportCommand(FileType.SPICE, true); }
 				},
@@ -353,6 +362,11 @@ public class ToolMenu {
 				},
 				new EMenuItem("Set Spice _Model...") {
 					public void run() { SimulationTool.setSpiceModel(); }
+				},
+				new EMenuItem("Manage Model Li_brary...") {
+					public void run() {
+						new com.sun.electric.tool.user.dialogs.SpiceModelManager(TopLevel.getCurrentJFrame());
+					}
 				},
 				new EMenuItem("Add M_ultiplier") {
 					public void run() { addMultiplierCommand(); }
@@ -531,6 +545,12 @@ public class ToolMenu {
 				},
 				new EMenuItem("Copy All Schematic _Names to Layout") {
 					public void run() { new AllSchemNamesToLay.RenameJob(); }
+				},
+				new EMenuItem("Propagate Schematic _Sizes to Layout") {
+					public void run() { new SchemSizesToLay.PropagateJob(); }
+				},
+				new EMenuItem("NCC + _Auto-Fix Size Mismatches") {
+					public void run() { nccAndFixSizes(); }
 				},
 				new EMenuItem("Highlight _Equivalent") {
 					public void run() { HighlightEquivalent.highlight(); }
@@ -858,6 +878,16 @@ public class ToolMenu {
 				},
 				new EMenuItem("Compile _Verilog to Netlist View") {
 					public void run() { compileVerilog(); }
+				}),
+
+			// ------------------- Analog Layout Synthesis
+			// mnemonic keys available: B DEFGHIJKLM OPQR TUVWXYZ
+			new EMenu("_Analog Layout Synthesis",
+				new EMenuItem("Synthesize Layout from _Current Cell") {
+					public void run() { synthesizeAnalogLayout(WindowFrame.needCurCell(), false); }
+				},
+				new EMenuItem("Synthesize Layout from _SPICE File...") {
+					public void run() { synthesizeAnalogLayoutFromSpice(); }
 				}),
 
 			// ------------------- Compaction
@@ -2447,6 +2477,91 @@ public class ToolMenu {
 	 * @param cell the cell to compile.
 	 * @param doItNow if the job must executed now
 	 */
+	// ==================== Analog Layout Synthesis ====================
+
+	private static void synthesizeAnalogLayout(Cell cell, boolean doItNow)
+	{
+		if (cell == null) return;
+		if (!cell.isSchematic())
+		{
+			System.out.println("ALSE: Please select a schematic cell");
+			return;
+		}
+		EditingPreferences ep = UserInterfaceMain.getEditingPreferences();
+		new AnalogLayoutSynthesisJob(cell, null, null, ep);
+	}
+
+	private static void synthesizeAnalogLayoutFromSpice()
+	{
+		String spiceFile = OpenFile.chooseInputFile(com.sun.electric.tool.io.FileType.SPICE, null, null);
+		if (spiceFile == null) return;
+		EditingPreferences ep = UserInterfaceMain.getEditingPreferences();
+		Library destLib = Library.getCurrent();
+		if (destLib == null)
+		{
+			System.out.println("ALSE: No current library");
+			return;
+		}
+		new AnalogLayoutSynthesisJob(null, spiceFile, destLib, ep);
+	}
+
+	private static class AnalogLayoutSynthesisJob extends Job
+	{
+		private Cell schematicCell;
+		private String spiceFile;
+		private Library destLib;
+		private EditingPreferences ep;
+
+		private AnalogLayoutSynthesisJob(Cell schematicCell, String spiceFile, Library destLib, EditingPreferences ep)
+		{
+			super("Analog Layout Synthesis", User.getUserTool(), Job.Type.CHANGE, null, null, Job.Priority.USER);
+			this.schematicCell = schematicCell;
+			this.spiceFile = spiceFile;
+			this.destLib = destLib;
+			this.ep = ep;
+			startJob();
+		}
+
+		public boolean doIt() throws JobException
+		{
+			// Get layout technology (not Schematics, which may be current)
+			Technology tech = Technology.getCurrent();
+			if (tech == null || tech.isLayout() == false)
+			{
+				// Fall back to user's default technology or mocmos
+				String defTech = User.getDefaultTechnology();
+				tech = Technology.findTechnology(defTech);
+				if (tech == null) tech = Technology.findTechnology("mocmos");
+			}
+			System.out.println("ALSE: Using technology: " + (tech != null ? tech.getTechName() : "null"));
+			com.sun.electric.tool.sc.analog.AnalogLayoutEngine engine =
+				new com.sun.electric.tool.sc.analog.AnalogLayoutEngine(tech, ep);
+
+			Cell result;
+			if (schematicCell != null)
+			{
+				Library lib = destLib != null ? destLib : schematicCell.getLibrary();
+				result = engine.synthesizeFromCell(schematicCell, lib);
+			}
+			else
+			{
+				result = engine.synthesizeFromSpice(spiceFile, null, destLib);
+			}
+
+			if (result != null)
+			{
+				System.out.println("ALSE: Layout cell created: " + result.describe(false));
+			}
+			else
+			{
+				System.out.println("ALSE: Synthesis failed");
+			}
+			return true;
+		}
+	}
+
+	// ==================== Silicon Compiler ====================
+
 	public static void doSiliconCompilation(Cell cell, boolean doItNow, SilComp.SilCompPrefs prefs, EditingPreferences ep)
 	{
 		if (cell == null) return;
@@ -2742,6 +2857,9 @@ public class ToolMenu {
 					return null;
 				}
 
+				// recognize transistor-level patterns and convert to gate-level
+				netlistStrings = com.sun.electric.tool.sc.GateRecognizer.transform(netlistStrings);
+
 				// store the QUISC netlist
 				String cellName = cell.getName() + "{net.quisc}";
 				Cell netlistCell = cell.getLibrary().findNodeProto(cellName);
@@ -2800,48 +2918,57 @@ public class ToolMenu {
 			}
 
 			if ((activities & PLACE_AND_ROUTE) != 0) {
+				long totalStart = System.currentTimeMillis();
+
 				// first grab the information in the netlist
-				System.out.println("Reading netlist in " + cell);
+				System.out.println("Silicon Compiler: Reading netlist from " + cell + " ...");
+				long stepStart = System.currentTimeMillis();
 				GetNetlist gnl = new GetNetlist();
 				if (gnl.readNetCurCell(cell)) {
-					System.out.println("Error compiling netlist");
+					System.out.println("ERROR: Failed to compile netlist");
 					return null;
 				}
+				System.out.println("  Netlist read in " + (System.currentTimeMillis() - stepStart) + " ms");
 
 				// do the placement
-				System.out.println("Placing cells");
+				System.out.println("Silicon Compiler: Placing cells (rows=" + prefs.numRows + ") ...");
+				stepStart = System.currentTimeMillis();
 				Place place = new Place(prefs);
 				String err = place.placeCells(gnl);
 				if (err != null) {
-					System.out.println(err);
+					System.out.println("ERROR in placement: " + err);
 					return null;
 				}
+				System.out.println("  Placement completed in " + (System.currentTimeMillis() - stepStart) + " ms");
 
 				// do the routing
-				System.out.println("Routing cells");
+				System.out.println("Silicon Compiler: Routing cells (H=" + prefs.horizRoutingArc + ", V=" + prefs.vertRoutingArc + ") ...");
+				stepStart = System.currentTimeMillis();
 				Route route = new Route(prefs);
 				err = route.routeCells(gnl);
 				if (err != null) {
-					System.out.println(err);
+					System.out.println("ERROR in routing: " + err);
 					return null;
 				}
+				System.out.println("  Routing completed in " + (System.currentTimeMillis() - stepStart) + " ms");
 
 				// generate the results
-				System.out.println("Generating layout");
+				System.out.println("Silicon Compiler: Generating layout ...");
+				stepStart = System.currentTimeMillis();
 				Maker maker = new Maker(ep, prefs);
 				Object result = maker.makeLayout(destLib, gnl);
 				if (result instanceof String) {
-					System.out.println((String) result);
+					System.out.println("ERROR in layout generation: " + (String) result);
 					if (Technology.getCurrent() == Schematics.tech()) {
-						System.out
-								.println("Should switch to a layout technology first (currently in Schematics)");
+						System.out.println("  Hint: Switch to a layout technology first (currently in Schematics)");
 						return null;
 					}
 				}
 				if (!(result instanceof Cell))
 					return null;
 				cell = (Cell) result;
-				System.out.println("Created " + cell);
+				long totalTime = System.currentTimeMillis() - totalStart;
+				System.out.println("Silicon Compiler: Created " + cell + " (total: " + totalTime + " ms)");
 			}
 			return cell;
 		}
@@ -3006,6 +3133,15 @@ public class ToolMenu {
 		}
 	}
 
+	private static void nccAndFixSizes() {
+		// Run NCC first, then propagate sizes
+		System.out.println("Running NCC + Auto-Fix Size Mismatches...");
+		System.out.println("Step 1: Running NCC...");
+		new NccJob(1);
+		// Step 2: Propagate sizes (runs after NCC completes via job queue)
+		new SchemSizesToLay.PropagateJob();
+	}
+
 	public static void runNccSchematicCrossProbing() {
 		EditWindow wnd = EditWindow.needCurrent();
 		if (wnd == null)
@@ -3023,6 +3159,31 @@ public class ToolMenu {
 	//
 	// FillGeneratorTool.generateAutoFill(cell, hierarchy, binary, false);
 	// }
+
+	/**
+	 * One-click Write & Run SPICE simulation.
+	 * Writes the SPICE deck for the current cell, runs ngspice (or configured engine),
+	 * and auto-loads the simulation results for plotting.
+	 */
+	private static void writeAndRunSpice()
+	{
+		// Ensure run choice is set to report output for this invocation
+		String prevRunChoice = SimulationTool.getSpiceRunChoice();
+		boolean prevRunProbe = SimulationTool.getSpiceRunProbe();
+
+		// Temporarily force run + report + probe for one-click operation
+		SimulationTool.setSpiceRunChoice(SimulationTool.spiceRunChoiceRunReportOutput);
+		SimulationTool.setSpiceRunProbe(true);
+
+		// Use the existing export command which handles write + run + probe
+		FileMenu.exportCommand(FileType.SPICE, true);
+
+		// Restore previous settings if they were different
+		if (!prevRunChoice.equals(SimulationTool.spiceRunChoiceRunReportOutput))
+			SimulationTool.setSpiceRunChoice(prevRunChoice);
+		if (!prevRunProbe)
+			SimulationTool.setSpiceRunProbe(false);
+	}
 
 	private static void plotChosen() {
 		String fileName = OpenFile.chooseInputFile(null, null, null);

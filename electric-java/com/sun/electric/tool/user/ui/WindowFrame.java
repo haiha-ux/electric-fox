@@ -107,6 +107,7 @@ public class WindowFrame extends Observable
 	/** the component tab */							private PaletteFrame paletteTab;
 	/** the layers tab */								private LayerTab layersTab;
     /** true if this window is finished */              private boolean finished = false;
+	/** the docked messages split pane (if docked) */	private JSplitPane dockedMessagesSplit = null;
     /** the index of this window */						private int index;
 	/** indicator of the most recent used window */		private int usageClock;
     /** the dynamic menu to hold WindowMenus */			private JMenu dynamicMenu;
@@ -414,6 +415,30 @@ public class WindowFrame extends Observable
 		explorerTab = new ExplorerTree(content.loadExplorerTrees());
 		JScrollPane scrolledTree = new JScrollPane(explorerTab);
 
+		// for waveform windows, add a signal filter field above the tree
+		JComponent explorerComponent;
+		if (content instanceof WaveformWindow)
+		{
+			javax.swing.JPanel explorerPanel = new javax.swing.JPanel(new java.awt.BorderLayout(0, 2));
+			javax.swing.JTextField filterField = new javax.swing.JTextField();
+			filterField.putClientProperty("JTextField.placeholderText", "Filter signals...");
+			filterField.putClientProperty("JTextField.showClearButton", true);
+			filterField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+				public void insertUpdate(javax.swing.event.DocumentEvent e) { filterTree(); }
+				public void removeUpdate(javax.swing.event.DocumentEvent e) { filterTree(); }
+				public void changedUpdate(javax.swing.event.DocumentEvent e) { filterTree(); }
+				private void filterTree() {
+					String text = filterField.getText().trim().toLowerCase();
+					explorerTab.setSignalFilter(text);
+				}
+			});
+			explorerPanel.add(filterField, java.awt.BorderLayout.NORTH);
+			explorerPanel.add(scrolledTree, java.awt.BorderLayout.CENTER);
+			explorerComponent = explorerPanel;
+		} else {
+			explorerComponent = scrolledTree;
+		}
+
 		// make a tabbed list of panes on the left
 		sideBar = new JTabbedPane();
 
@@ -425,7 +450,7 @@ public class WindowFrame extends Observable
 		loadComponentMenuForTechnology();
 
 		sideBar.add("Components", paletteTab.getMainPanel());
-		sideBar.add("Explorer", scrolledTree);
+		sideBar.add("Explorer", explorerComponent);
 		sideBar.add("Layers", layersTab);
 
 		sideBar.setSelectedIndex(User.getDefaultWindowTab());
@@ -449,11 +474,18 @@ public class WindowFrame extends Observable
 		sideBarOnLeft = !User.isSideBarOnRight();
 
         JComponent panel = content.getPanel();
-        if (User.isDockMessagesWindow()) {
+        if (User.isDockMessagesWindow() && !(content instanceof WaveformWindow)) {
             JSplitPane js2 = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
             js2.setTopComponent(panel);
-            js2.setBottomComponent(new MessagesWindow().getContent());
-            js2.setDividerLocation(js2.getMaximumDividerLocation());
+            java.awt.Container msgContent = new MessagesWindow().getContent();
+            // Set minimum size so messages pane can't be collapsed to zero
+            if (msgContent instanceof JComponent)
+                ((JComponent)msgContent).setMinimumSize(new Dimension(100, 80));
+            js2.setBottomComponent(msgContent);
+            js2.setResizeWeight(0.75);
+            js2.setDividerLocation(0.75);
+            js2.setOneTouchExpandable(true);
+            dockedMessagesSplit = js2;
             panel = js2;
         }
 
@@ -745,6 +777,41 @@ public class WindowFrame extends Observable
 	 * @return the content of this window.
 	 */
 	public WindowContent getContent() { return content; }
+
+	/**
+	 * Method to restore the docked Messages Window to a visible size.
+	 * If the divider was collapsed, restores it to 75% position.
+	 */
+	public void restoreDockedMessages()
+	{
+		if (dockedMessagesSplit != null)
+		{
+			int totalHeight = dockedMessagesSplit.getHeight();
+			if (totalHeight > 0)
+			{
+				int divLoc = dockedMessagesSplit.getDividerLocation();
+				int minMessages = 80;
+				// If messages pane is collapsed (divider too close to bottom)
+				if (divLoc > totalHeight - minMessages)
+				{
+					dockedMessagesSplit.setDividerLocation(0.75);
+				}
+			}
+			dockedMessagesSplit.revalidate();
+		}
+	}
+
+	/**
+	 * Method to restore docked Messages in all open WindowFrames.
+	 */
+	public static void restoreAllDockedMessages()
+	{
+		for (Iterator<WindowFrame> it = getWindows(); it.hasNext(); )
+		{
+			WindowFrame wf = it.next();
+			wf.restoreDockedMessages();
+		}
+	}
 
     /**
 	 * Method to get the current WindowFrame. If there is no current

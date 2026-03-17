@@ -203,23 +203,23 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 	/** The background color */								private Color backgroundColor;
 	/** drop target (for drag and drop) */					public WaveFormDropTarget waveformDropTarget = new WaveFormDropTarget();
 
-	private static final ImageIcon iconAddPanel = Resources.getResource(WaveformWindow.class, "ButtonSimAddPanel.gif");
-	private static final ImageIcon iconLockXAxes = Resources.getResource(WaveformWindow.class, "ButtonSimLockTime.gif");
-	private static final ImageIcon iconUnLockXAxes = Resources.getResource(WaveformWindow.class, "ButtonSimUnLockTime.gif");
-	private static final ImageIcon iconRefresh = Resources.getResource(WaveformWindow.class, "ButtonSimRefresh.gif");
-	private static final ImageIcon iconLineOnPointOn = Resources.getResource(WaveformWindow.class, "ButtonSimLineOnPointOn.gif");
-	private static final ImageIcon iconLineOnPointOff = Resources.getResource(WaveformWindow.class, "ButtonSimLineOnPointOff.gif");
-	private static final ImageIcon iconLineOffPointOn = Resources.getResource(WaveformWindow.class, "ButtonSimLineOffPointOn.gif");
-	private static final ImageIcon iconToggleGrid = Resources.getResource(WaveformWindow.class, "ButtonSimGrid.gif");
-	private static final ImageIcon iconGrowPanel = Resources.getResource(WaveformWindow.class, "ButtonSimGrow.gif");
-	private static final ImageIcon iconShrinkPanel = Resources.getResource(WaveformWindow.class, "ButtonSimShrink.gif");
-	private static final ImageIcon iconVCRRewind = Resources.getResource(WaveformWindow.class, "ButtonVCRRewind.gif");
-	private static final ImageIcon iconVCRPlayBackward = Resources.getResource(WaveformWindow.class, "ButtonVCRPlayBackward.gif");
-	private static final ImageIcon iconVCRStop = Resources.getResource(WaveformWindow.class, "ButtonVCRStop.gif");
-	private static final ImageIcon iconVCRPlay = Resources.getResource(WaveformWindow.class, "ButtonVCRPlay.gif");
-	private static final ImageIcon iconVCRToEnd = Resources.getResource(WaveformWindow.class, "ButtonVCRToEnd.gif");
-	private static final ImageIcon iconVCRFaster = Resources.getResource(WaveformWindow.class, "ButtonVCRFaster.gif");
-	private static final ImageIcon iconVCRSlower = Resources.getResource(WaveformWindow.class, "ButtonVCRSlower.gif");
+	private static final ImageIcon iconAddPanel = Resources.getIcon(WaveformWindow.class, "ButtonSimAddPanel");
+	private static final ImageIcon iconLockXAxes = Resources.getIcon(WaveformWindow.class, "ButtonSimLockTime");
+	private static final ImageIcon iconUnLockXAxes = Resources.getIcon(WaveformWindow.class, "ButtonSimUnLockTime");
+	private static final ImageIcon iconRefresh = Resources.getIcon(WaveformWindow.class, "ButtonSimRefresh");
+	private static final ImageIcon iconLineOnPointOn = Resources.getIcon(WaveformWindow.class, "ButtonSimLineOnPointOn");
+	private static final ImageIcon iconLineOnPointOff = Resources.getIcon(WaveformWindow.class, "ButtonSimLineOnPointOff");
+	private static final ImageIcon iconLineOffPointOn = Resources.getIcon(WaveformWindow.class, "ButtonSimLineOffPointOn");
+	private static final ImageIcon iconToggleGrid = Resources.getIcon(WaveformWindow.class, "ButtonSimGrid");
+	private static final ImageIcon iconGrowPanel = Resources.getIcon(WaveformWindow.class, "ButtonSimGrow");
+	private static final ImageIcon iconShrinkPanel = Resources.getIcon(WaveformWindow.class, "ButtonSimShrink");
+	private static final ImageIcon iconVCRRewind = Resources.getIcon(WaveformWindow.class, "ButtonVCRRewind");
+	private static final ImageIcon iconVCRPlayBackward = Resources.getIcon(WaveformWindow.class, "ButtonVCRPlayBackward");
+	private static final ImageIcon iconVCRStop = Resources.getIcon(WaveformWindow.class, "ButtonVCRStop");
+	private static final ImageIcon iconVCRPlay = Resources.getIcon(WaveformWindow.class, "ButtonVCRPlay");
+	private static final ImageIcon iconVCRToEnd = Resources.getIcon(WaveformWindow.class, "ButtonVCRToEnd");
+	private static final ImageIcon iconVCRFaster = Resources.getIcon(WaveformWindow.class, "ButtonVCRFaster");
+	private static final ImageIcon iconVCRSlower = Resources.getIcon(WaveformWindow.class, "ButtonVCRSlower");
 
 	private static final Cursor resizeRowCursor = Cursor.getPredefinedCursor(Cursor.N_RESIZE_CURSOR);
 	private static final Cursor resizeColumnCursor = Cursor.getPredefinedCursor(Cursor.E_RESIZE_CURSOR);
@@ -294,10 +294,10 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 
 		// the top part of the waveform window: status information
 		JButton addPanel = new JButton(iconAddPanel);
-		addPanel.setBorderPainted(false);
+		styleWaveformButton(addPanel);
 		addPanel.setDefaultCapable(false);
 		addPanel.setToolTipText("Create new waveform panel");
-		Dimension minWid = new Dimension(iconAddPanel.getIconWidth()+4, iconAddPanel.getIconHeight()+4);
+		Dimension minWid = new Dimension(iconAddPanel.getIconWidth()+8, iconAddPanel.getIconHeight()+8);
 		addPanel.setMinimumSize(minWid);
 		addPanel.setPreferredSize(minWid);
 		gbc = new GridBagConstraints();
@@ -310,10 +310,10 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		});
 
 		showPoints = new JButton(iconLineOnPointOff);
-		showPoints.setBorderPainted(false);
+		styleWaveformButton(showPoints);
 		showPoints.setDefaultCapable(false);
 		showPoints.setToolTipText("Toggle display of vertex points and lines");
-		minWid = new Dimension(iconLineOnPointOff.getIconWidth()+4, iconLineOnPointOff.getIconHeight()+4);
+		minWid = new Dimension(iconLineOnPointOff.getIconWidth()+8, iconLineOnPointOff.getIconHeight()+8);
 		showPoints.setMinimumSize(minWid);
 		showPoints.setPreferredSize(minWid);
 		gbc = new GridBagConstraints();
@@ -326,10 +326,10 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		});
 
 		JButton toggleGrid = new JButton(iconToggleGrid);
-		toggleGrid.setBorderPainted(false);
+		styleWaveformButton(toggleGrid);
 		toggleGrid.setDefaultCapable(false);
 		toggleGrid.setToolTipText("Toggle display of a grid");
-		minWid = new Dimension(iconToggleGrid.getIconWidth()+4, iconToggleGrid.getIconHeight()+4);
+		minWid = new Dimension(iconToggleGrid.getIconWidth()+8, iconToggleGrid.getIconHeight()+8);
 		toggleGrid.setMinimumSize(minWid);
 		toggleGrid.setPreferredSize(minWid);
 		gbc = new GridBagConstraints();
@@ -342,10 +342,10 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		});
 
 		refresh = new JButton(iconRefresh);
-		refresh.setBorderPainted(false);
+		styleWaveformButton(refresh);
 		refresh.setDefaultCapable(false);
 		refresh.setToolTipText("Reread stimuli data file and update waveforms");
-		minWid = new Dimension(iconRefresh.getIconWidth()+4, iconRefresh.getIconHeight()+4);
+		minWid = new Dimension(iconRefresh.getIconWidth()+8, iconRefresh.getIconHeight()+8);
 		refresh.setMinimumSize(minWid);
 		refresh.setPreferredSize(minWid);
 		gbc = new GridBagConstraints();
@@ -358,10 +358,10 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		});
 
 		xAxisLockButton = new JButton(iconLockXAxes);
-		xAxisLockButton.setBorderPainted(false);
+		styleWaveformButton(xAxisLockButton);
 		xAxisLockButton.setDefaultCapable(false);
 		xAxisLockButton.setToolTipText("Lock all panels horizontally");
-		minWid = new Dimension(iconLockXAxes.getIconWidth()+4, iconLockXAxes.getIconHeight()+4);
+		minWid = new Dimension(iconLockXAxes.getIconWidth()+8, iconLockXAxes.getIconHeight()+8);
 		xAxisLockButton.setMinimumSize(minWid);
 		xAxisLockButton.setPreferredSize(minWid);
 		gbc = new GridBagConstraints();
@@ -390,10 +390,10 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		});
 
 		growPanel = new JButton(iconGrowPanel);
-		growPanel.setBorderPainted(false);
+		styleWaveformButton(growPanel);
 		growPanel.setDefaultCapable(false);
 		growPanel.setToolTipText("Increase minimum panel height");
-		minWid = new Dimension(iconGrowPanel.getIconWidth()+4, iconGrowPanel.getIconHeight()+4);
+		minWid = new Dimension(iconGrowPanel.getIconWidth()+8, iconGrowPanel.getIconHeight()+8);
 		growPanel.setMinimumSize(minWid);
 		growPanel.setPreferredSize(minWid);
 		gbc = new GridBagConstraints();
@@ -406,10 +406,9 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		});
 
 		shrinkPanel = new JButton(iconShrinkPanel);
-		shrinkPanel.setBorderPainted(false);
-		shrinkPanel.setDefaultCapable(false);
+		styleWaveformButton(shrinkPanel);
 		shrinkPanel.setToolTipText("Decrease minimum panel height");
-		minWid = new Dimension(iconShrinkPanel.getIconWidth()+4, iconShrinkPanel.getIconHeight()+4);
+		minWid = new Dimension(iconShrinkPanel.getIconWidth()+8, iconShrinkPanel.getIconHeight()+8);
 		shrinkPanel.setMinimumSize(minWid);
 		shrinkPanel.setPreferredSize(minWid);
 		gbc = new GridBagConstraints();
@@ -443,6 +442,7 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		xAxisLabelPanel.add(mainPos, gbc);
 
 		centerMain = new JButton("Center");
+		styleWaveformButton(centerMain);
 		centerMain.setToolTipText("Center the main (dashed) X axis cursor");
 		gbc = new GridBagConstraints();
 		gbc.gridx = 1;       gbc.gridy = 0;
@@ -465,6 +465,7 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		xAxisLabelPanel.add(extPos, gbc);
 
 		centerExt = new JButton("Center");
+		styleWaveformButton(centerExt);
 		centerExt.setToolTipText("Center the extension (dotted) X axis cursor");
 		gbc = new GridBagConstraints();
 		gbc.gridx = 3;       gbc.gridy = 0;
@@ -505,10 +506,9 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 
 		// add VCR controls
 		JButton vcrButtonRewind = new JButton(iconVCRRewind);
-		vcrButtonRewind.setBorderPainted(false);
-		vcrButtonRewind.setDefaultCapable(false);
+		styleWaveformButton(vcrButtonRewind);
 		vcrButtonRewind.setToolTipText("Rewind main X axis cursor to start");
-		minWid = new Dimension(iconVCRRewind.getIconWidth()+4, iconVCRRewind.getIconHeight()+4);
+		minWid = new Dimension(iconVCRRewind.getIconWidth()+8, iconVCRRewind.getIconHeight()+8);
 		vcrButtonRewind.setMinimumSize(minWid);
 		vcrButtonRewind.setPreferredSize(minWid);
 		gbc = new GridBagConstraints();
@@ -521,10 +521,9 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		});
 
 		JButton vcrButtonPlayBackwards = new JButton(iconVCRPlayBackward);
-		vcrButtonPlayBackwards.setBorderPainted(false);
-		vcrButtonPlayBackwards.setDefaultCapable(false);
+		styleWaveformButton(vcrButtonPlayBackwards);
 		vcrButtonPlayBackwards.setToolTipText("Play main X axis cursor backwards");
-		minWid = new Dimension(iconVCRPlayBackward.getIconWidth()+4, iconVCRPlayBackward.getIconHeight()+4);
+		minWid = new Dimension(iconVCRPlayBackward.getIconWidth()+8, iconVCRPlayBackward.getIconHeight()+8);
 		vcrButtonPlayBackwards.setMinimumSize(minWid);
 		vcrButtonPlayBackwards.setPreferredSize(minWid);
 		gbc = new GridBagConstraints();
@@ -537,10 +536,9 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		});
 
 		JButton vcrButtonStop = new JButton(iconVCRStop);
-		vcrButtonStop.setBorderPainted(false);
-		vcrButtonStop.setDefaultCapable(false);
+		styleWaveformButton(vcrButtonStop);
 		vcrButtonStop.setToolTipText("Stop moving main X axis cursor");
-		minWid = new Dimension(iconVCRStop.getIconWidth()+4, iconVCRStop.getIconHeight()+4);
+		minWid = new Dimension(iconVCRStop.getIconWidth()+8, iconVCRStop.getIconHeight()+8);
 		vcrButtonStop.setMinimumSize(minWid);
 		vcrButtonStop.setPreferredSize(minWid);
 		gbc = new GridBagConstraints();
@@ -553,10 +551,9 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		});
 
 		JButton vcrButtonPlay = new JButton(iconVCRPlay);
-		vcrButtonPlay.setBorderPainted(false);
-		vcrButtonPlay.setDefaultCapable(false);
+		styleWaveformButton(vcrButtonPlay);
 		vcrButtonPlay.setToolTipText("Play main X axis cursor");
-		minWid = new Dimension(iconVCRPlay.getIconWidth()+4, iconVCRPlay.getIconHeight()+4);
+		minWid = new Dimension(iconVCRPlay.getIconWidth()+8, iconVCRPlay.getIconHeight()+8);
 		vcrButtonPlay.setMinimumSize(minWid);
 		vcrButtonPlay.setPreferredSize(minWid);
 		gbc = new GridBagConstraints();
@@ -569,10 +566,9 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		});
 
 		JButton vcrButtonToEnd = new JButton(iconVCRToEnd);
-		vcrButtonToEnd.setBorderPainted(false);
-		vcrButtonToEnd.setDefaultCapable(false);
+		styleWaveformButton(vcrButtonToEnd);
 		vcrButtonToEnd.setToolTipText("Move main X axis cursor to end");
-		minWid = new Dimension(iconVCRToEnd.getIconWidth()+4, iconVCRToEnd.getIconHeight()+4);
+		minWid = new Dimension(iconVCRToEnd.getIconWidth()+8, iconVCRToEnd.getIconHeight()+8);
 		vcrButtonToEnd.setMinimumSize(minWid);
 		vcrButtonToEnd.setPreferredSize(minWid);
 		gbc = new GridBagConstraints();
@@ -585,10 +581,9 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		});
 
 		JButton vcrButtonFaster = new JButton(iconVCRFaster);
-		vcrButtonFaster.setBorderPainted(false);
-		vcrButtonFaster.setDefaultCapable(false);
+		styleWaveformButton(vcrButtonFaster);
 		vcrButtonFaster.setToolTipText("Move main X axis cursor faster");
-		minWid = new Dimension(iconVCRFaster.getIconWidth()+4, iconVCRFaster.getIconHeight()+4);
+		minWid = new Dimension(iconVCRFaster.getIconWidth()+8, iconVCRFaster.getIconHeight()+8);
 		vcrButtonFaster.setMinimumSize(minWid);
 		vcrButtonFaster.setPreferredSize(minWid);
 		gbc = new GridBagConstraints();
@@ -601,10 +596,9 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		});
 
 		JButton vcrButtonSlower = new JButton(iconVCRSlower);
-		vcrButtonSlower.setBorderPainted(false);
-		vcrButtonSlower.setDefaultCapable(false);
+		styleWaveformButton(vcrButtonSlower);
 		vcrButtonSlower.setToolTipText("Move main X axis cursor slower");
-		minWid = new Dimension(iconVCRSlower.getIconWidth()+4, iconVCRSlower.getIconHeight()+4);
+		minWid = new Dimension(iconVCRSlower.getIconWidth()+8, iconVCRSlower.getIconHeight()+8);
 		vcrButtonSlower.setMinimumSize(minWid);
 		vcrButtonSlower.setPreferredSize(minWid);
 		gbc = new GridBagConstraints();
@@ -4149,6 +4143,17 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		public void dragOver(DropTargetDragEvent e)
 		{
 			e.acceptDrag(e.getDropAction());
+			// Visual feedback: select target panel during drag
+			java.awt.Component comp = e.getDropTargetContext().getComponent();
+			if (comp instanceof OnePanel)
+			{
+				Panel p = ((OnePanel)comp).getPanel();
+				if (p != null) p.makeSelectedPanel(-1, -1);
+			}
+			else if (comp instanceof Panel)
+			{
+				((Panel)comp).makeSelectedPanel(-1, -1);
+			}
 		}
 
 		public void dropActionChanged(DropTargetDragEvent e)
@@ -4746,9 +4751,64 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		// nothing saved, so show a default set of signals (if it even exists)
 		if (sd.isAnalog())
 		{
+			// auto-populate analog signals: group voltages together, currents together
 			int height = User.getWaveformAnalogPanelHeight();
-			Panel wp = new Panel(ww, height);
-			wp.makeSelectedPanel(-1, -1);
+			List<Signal<?>> voltageSignals = new ArrayList<Signal<?>>();
+			List<Signal<?>> currentSignals = new ArrayList<Signal<?>>();
+			List<Signal<?>> otherSignals = new ArrayList<Signal<?>>();
+			for(Signal<?> sig : sc.getSignals()) {
+				String sigName = sig.getSignalName().toLowerCase();
+				if (sigName.indexOf('@') >= 0) continue;
+				if (sigName.startsWith("i(") || sigName.startsWith("i_") ||
+					sigName.equals("isource") || sigName.startsWith("#branch"))
+					currentSignals.add(sig);
+				else
+					voltageSignals.add(sig);
+			}
+
+			// Show voltage signals: each in its own panel (up to 8, then overlay rest)
+			if (voltageSignals.size() > 0)
+			{
+				int limit = Math.min(voltageSignals.size(), 8);
+				for (int i = 0; i < limit; i++)
+				{
+					Panel wp = new Panel(ww, height);
+					wp.makeSelectedPanel(-1, -1);
+					new WaveSignal(wp, voltageSignals.get(i));
+				}
+				if (voltageSignals.size() > 8)
+				{
+					// overlay remaining signals in one panel
+					Panel wp = new Panel(ww, height);
+					wp.makeSelectedPanel(-1, -1);
+					for (int i = 8; i < voltageSignals.size(); i++)
+						new WaveSignal(wp, voltageSignals.get(i));
+				}
+			}
+			// Show current signals: each in own panel (up to 4, then overlay rest)
+			if (currentSignals.size() > 0)
+			{
+				int limit = Math.min(currentSignals.size(), 4);
+				for (int i = 0; i < limit; i++)
+				{
+					Panel wp = new Panel(ww, height);
+					wp.makeSelectedPanel(-1, -1);
+					new WaveSignal(wp, currentSignals.get(i));
+				}
+				if (currentSignals.size() > 4)
+				{
+					Panel wp = new Panel(ww, height);
+					wp.makeSelectedPanel(-1, -1);
+					for (int i = 4; i < currentSignals.size(); i++)
+						new WaveSignal(wp, currentSignals.get(i));
+				}
+			}
+			// fallback: create at least one empty panel if no signals found
+			if (voltageSignals.size() == 0 && currentSignals.size() == 0)
+			{
+				Panel wp = new Panel(ww, height);
+				wp.makeSelectedPanel(-1, -1);
+			}
 		} else
 		{
 			// put all top-level signals in, up to a limit
@@ -4768,6 +4828,9 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 			}
 		}
 		ww.getPanel().validate();
+		// Auto-fit Y-axis for every panel so signals are visible
+		for (Panel wp : ww.wavePanels)
+			wp.fitToSignal(null);
 		ww.fillScreen();
 	}
 
@@ -4853,6 +4916,15 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
      * @param ws the signal
      * @return a list of signals
      */
+	/**
+	 * Style a button for the waveform toolbar with modern FlatLaf appearance.
+	 */
+	private static void styleWaveformButton(JButton btn)
+	{
+		btn.putClientProperty("JButton.buttonType", "toolBarButton");
+		btn.setFocusable(false);
+	}
+
     public static List<Signal<?>> getSignalsFromExtractedNet(SignalCollection sc, Signal<?> ws) {
         String sigName = ws.getFullName();
         List<Signal<?>> ret = new ArrayList<Signal<?>>();

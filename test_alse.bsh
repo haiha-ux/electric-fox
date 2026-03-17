@@ -1,0 +1,70 @@
+import com.sun.electric.database.hierarchy.*;
+import com.sun.electric.database.*;
+import com.sun.electric.technology.*;
+import com.sun.electric.tool.sc.analog.*;
+import com.sun.electric.tool.io.input.*;
+import com.sun.electric.tool.io.*;
+
+// Load the NOT library
+url = new java.io.File("NOT.jelib").toURI().toURL();
+LibraryFiles.readLibrary(EditingPreferences.getInstance(), url, null, FileType.JELIB, true);
+lib = Library.findLibrary("NOT");
+if (lib == null) { System.out.println("ERROR: Library not found"); return; }
+
+cell = lib.findNodeProto("NOT{sch}");
+if (cell == null) { System.out.println("ERROR: NOT{sch} not found"); return; }
+System.out.println("Found: " + cell.describe(false));
+
+// Delete existing layout cell if present
+old = lib.findNodeProto("NOT{lay}");
+if (old != null) { old.kill(); System.out.println("Deleted old NOT{lay}"); }
+
+tech = Technology.getMocmosTechnology();
+ep = EditingPreferences.getInstance();
+engine = new AnalogLayoutEngine(tech, ep);
+layCell = engine.synthesizeFromCell(cell, lib);
+
+if (layCell != null) {
+    System.out.println("Layout cell created: " + layCell.describe(false));
+
+    // Run DRC
+    System.out.println("\n--- Running DRC ---");
+    dp = new com.sun.electric.tool.drc.DRC.DRCPreferences(false);
+    errorLog = com.sun.electric.tool.drc.Quick.checkDesignRules(dp, layCell, null, null);
+    numErrors = errorLog != null ? errorLog.getNumErrors() : 0;
+    if (numErrors == 0) System.out.println("DRC: CLEAN - 0 errors!");
+    else {
+        System.out.println("DRC: " + numErrors + " errors found");
+        for (i = 0; i < numErrors; i++) {
+            err = errorLog.getLog(i);
+            System.out.println("  DRC: " + err.getMessage());
+        }
+    }
+
+    // Well check
+    System.out.println("\n--- Running Well Check ---");
+    try {
+        wellPrefs = new com.sun.electric.tool.erc.ERCWellCheck.WellCheckPreferences(false);
+        numWellErrors = com.sun.electric.tool.erc.ERCWellCheck.checkERCWell(layCell, wellPrefs);
+        System.out.println("Well: " + numWellErrors + " errors");
+    } catch (Exception e) { System.out.println("Well check: " + e.getMessage()); }
+
+    // Run NCC
+    System.out.println("\n--- Running NCC ---");
+    try {
+        nccOpts = new com.sun.electric.tool.ncc.NccOptions();
+        nccResult = com.sun.electric.tool.ncc.NccEngine.compare(
+            cell, com.sun.electric.database.variable.VarContext.globalContext,
+            layCell, com.sun.electric.database.variable.VarContext.globalContext,
+            null, nccOpts, new com.sun.electric.tool.ncc.Aborter(null));
+        if (nccResult != null) {
+            if (nccResult.match()) System.out.println("NCC: MATCH - schematic and layout are equivalent");
+            else System.out.println("NCC: MISMATCH - " + nccResult.why());
+        }
+    } catch (Exception e) { System.out.println("NCC: " + e.getMessage()); }
+
+    // Save
+    System.out.println("\n--- Saving ---");
+    lib.save();
+    System.out.println("Saved.");
+}
