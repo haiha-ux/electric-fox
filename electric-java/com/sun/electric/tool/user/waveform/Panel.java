@@ -301,7 +301,7 @@ public class Panel extends JPanel
 		leftHalf.add(moveUp, gbc);
 		moveUp.addActionListener(new ActionListener()
 		{
-			public void actionPerformed(ActionEvent evt) { waveWindow.moveSelectedPanel(true); }
+			public void actionPerformed(ActionEvent evt) { waveWindow.movePanel(Panel.this, true); }
 		});
 
 		// the "move down" button for this panel
@@ -319,7 +319,7 @@ public class Panel extends JPanel
 		leftHalf.add(moveDown, gbc);
 		moveDown.addActionListener(new ActionListener()
 		{
-			public void actionPerformed(ActionEvent evt) { waveWindow.moveSelectedPanel(false); }
+			public void actionPerformed(ActionEvent evt) { waveWindow.movePanel(Panel.this, false); }
 		});
 
 		deleteAllSignals.addActionListener(new ActionListener()

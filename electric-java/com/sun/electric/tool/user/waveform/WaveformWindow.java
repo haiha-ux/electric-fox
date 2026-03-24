@@ -438,8 +438,9 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		truthTableBtn.setToolTipText("Toggle truth table analysis panel");
 		truthTableBtn.setPreferredSize(new Dimension(90, 24));
 		gbc = new GridBagConstraints();
-		gbc.gridx = 9;       gbc.gridy = 1;
-		gbc.anchor = GridBagConstraints.CENTER;
+		gbc.gridx = 10;      gbc.gridy = 1;
+		gbc.anchor = GridBagConstraints.WEST;
+		gbc.insets = new Insets(0, 4, 0, 0);
 		overall.add(truthTableBtn, gbc);
 		truthTableBtn.addActionListener(e -> toggleTruthTable());
 
