@@ -1160,6 +1160,15 @@ public class AnalogLayoutEngine
 			sogPrefs.useParallelRoutes = false;
 			sogEngine.setPrefs(sogPrefs);
 
+			// Configure cell parameters: force grid alignment on all metal arcs
+			com.sun.electric.tool.routing.SeaOfGates.SeaOfGatesCellParameters sogParams =
+				new com.sun.electric.tool.routing.SeaOfGates.SeaOfGatesCellParameters(cell);
+			for (Iterator<ArcProto> it = tech.getArcs(); it.hasNext(); )
+			{
+				ArcProto ap = it.next();
+				if (ap.getFunction().isMetal()) sogParams.setGridForced(ap, true);
+			}
+
 			// Use Electric's built-in handler for direct cell modification
 			SeaOfGatesEngine.Handler handler =
 				com.sun.electric.tool.routing.seaOfGates.SeaOfGatesHandlers.getDefault(
@@ -1167,7 +1176,7 @@ public class AnalogLayoutEngine
 					com.sun.electric.tool.routing.Routing.SoGContactsStrategy.SOGCONTACTSATTOPLEVEL,
 					null, ep);
 
-			sogEngine.routeIt(handler, cell, false, arcsToRoute);
+			sogEngine.routeIt(handler, cell, false, arcsToRoute, sogParams);
 
 			// Clean up any remaining unrouted arcs (SOG replaces them with metal)
 			ArcProto unroutedType = com.sun.electric.technology.technologies.Generic.tech().unrouted_arc;
