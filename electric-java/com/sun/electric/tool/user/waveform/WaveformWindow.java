@@ -132,6 +132,7 @@ import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
@@ -167,6 +168,8 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 	/** mapping from Signals to entries in "SIGNALS" tree*/	private Map<Signal<?>,TreePath> treePathFromSignal = new HashMap<Signal<?>,TreePath>();
 	/** true if rebuilding the list of panels */			private boolean rebuildingSignalNameList = false;
 	/** the main scroll of all panels. */					private JScrollPane scrollAll;
+	/** truth table panel and split pane. */				private TruthTablePanel truthTablePanel;
+	/** split pane for waveform + truth table. */			private JSplitPane truthTableSplit;
 	/** left panel: the signal names */						private JPanel left;
 	/** right panel: the signal traces */					private JPanel right;
 	/** the table with panels and labels */					private WaveTable table;
@@ -284,13 +287,21 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		// a drop target for the table
 		new DropTarget(table, DnDConstants.ACTION_LINK, waveformDropTarget, true);
 
+		// Truth table panel (right side, initially hidden)
+		truthTablePanel = new TruthTablePanel(this);
+		truthTableSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, scrollAll, truthTablePanel);
+		truthTableSplit.setResizeWeight(1.0); // waveform gets all extra space
+		truthTableSplit.setDividerSize(6);
+		truthTablePanel.setVisible(false);
+		truthTableSplit.setDividerLocation(1.0); // start fully collapsed
+
 		GridBagConstraints gbc = new GridBagConstraints();
 		gbc.gridx = 0;       gbc.gridy = 2;
 		gbc.gridwidth = 11;  gbc.gridheight = 1;
 		gbc.weightx = 0;     gbc.weighty = 1;
 		gbc.anchor = GridBagConstraints.CENTER;
 		gbc.fill = GridBagConstraints.BOTH;
-		overall.add(scrollAll, gbc);
+		overall.add(truthTableSplit, gbc);
 
 		// the top part of the waveform window: status information
 		JButton addPanel = new JButton(iconAddPanel);
@@ -419,6 +430,18 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		{
 			public void actionPerformed(ActionEvent evt) { growPanels(0.8); }
 		});
+
+		// Truth Table toggle button
+		JButton truthTableBtn = new JButton("Truth Table");
+		truthTableBtn.setFont(truthTableBtn.getFont().deriveFont(10f));
+		styleWaveformButton(truthTableBtn);
+		truthTableBtn.setToolTipText("Toggle truth table analysis panel");
+		truthTableBtn.setPreferredSize(new Dimension(90, 24));
+		gbc = new GridBagConstraints();
+		gbc.gridx = 9;       gbc.gridy = 1;
+		gbc.anchor = GridBagConstraints.CENTER;
+		overall.add(truthTableBtn, gbc);
+		truthTableBtn.addActionListener(e -> toggleTruthTable());
 
 		// the X axis section that shows the value of the main and extension cursors
 		JPanel xAxisLabelPanel = new JPanel();
@@ -3861,6 +3884,26 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 	}
 
 	public boolean isShowGrid() { return showGrid; }
+
+	/**
+	 * Toggle the truth table panel on the right side of the waveform window.
+	 * When shown, analyzes all displayed signals to build a truth table.
+	 */
+	public void toggleTruthTable()
+	{
+		boolean visible = !truthTablePanel.isVisible();
+		truthTablePanel.setVisible(visible);
+		if (visible)
+		{
+			truthTableSplit.setDividerLocation(truthTableSplit.getWidth() - 380);
+			truthTablePanel.analyzeFromPanels();
+		}
+		else
+		{
+			truthTableSplit.setDividerLocation(1.0);
+		}
+		truthTableSplit.revalidate();
+	}
 
 	/**
 	 * Method to add a signal to the display.
