@@ -34,6 +34,7 @@ import com.sun.electric.database.topology.NodeInst;
 import com.sun.electric.database.topology.PortInst;
 import com.sun.electric.technology.*;
 import com.sun.electric.technology.TransistorSize;
+import com.sun.electric.tool.routing.seaOfGates.SeaOfGatesEngine;
 
 import java.util.*;
 
@@ -88,12 +89,12 @@ public class AnalogLayoutEngine
 		graph = CircuitGraphBuilder.fromCell(schematicCell);
 		if (graph == null) { System.out.println("ALSE ERROR: Failed to build circuit graph"); return null; }
 
-		// Hierarchical bottom-up: synthesize sub-cell layouts first
+		// Hierarchical: flatten sub-cells into parent for global optimization
 		if (graph.isHierarchical())
 		{
 			System.out.println("  Hierarchical design: " + graph.getSubCircuits().size() +
 				" sub-cells, " + graph.getTotalDeviceCount() + " total devices");
-			synthesizeSubCells(graph, destLib);
+			graph.flatten();
 		}
 
 		return runPipeline(schematicCell.getName(), destLib);
@@ -399,6 +400,22 @@ public class AnalogLayoutEngine
 		double DEVICE_SPACING = rules.getDeviceSpacing();
 		double ROW_SEPARATION = rules.getRowSeparation();
 		double WELL_CON_MARGIN = rules.getWellContactMargin();
+
+		// Estimate channel nets: signal nets that span both NMOS and PMOS regions
+		// need M3 channel routing. Expand row separation if many nets need routing.
+		int estimatedChannelNets = graph.getSignalNets().size();
+		double viaW23 = m2m3Con != null ? m2m3Con.getDefWidth(ep) : 5;
+		double m2Spacing = rules.getLayerSpacing(rules.getMetal2Layer(), rules.getMetal2Layer());
+		double estTrackPitch = snap(Math.max(viaW23 + m2Spacing, 8));
+		double channelNeeded = estimatedChannelNets * estTrackPitch;
+		double channelAvailable = ROW_SEPARATION - 2 * rules.getSupplyBusOffset() - 6; // minus buses and margins
+		if (channelNeeded > channelAvailable)
+		{
+			double extraSep = channelNeeded - channelAvailable;
+			ROW_SEPARATION = snap(ROW_SEPARATION + extraSep);
+			System.out.println("    Channel expanded: " + estimatedChannelNets + " est. nets need " +
+				fmt(channelNeeded) + " lambda, row separation -> " + fmt(ROW_SEPARATION));
+		}
 		double CONTACT_OFFSET = rules.getContactOffset();
 		double BUS_OFFSET = rules.getSupplyBusOffset();
 
@@ -620,7 +637,8 @@ public class AnalogLayoutEngine
 		System.out.println("    Supply wires: " + supplyWires);
 
 		// ==================== SIGNAL NET WIRING ====================
-		int sigWires = wireSignalNets(devNodes, internalNets, cell);
+		// Use Sea-of-Gates router for robust DRC-clean routing
+		int sigWires = routeSignalNetsSOG(devNodes, internalNets, cell);
 		System.out.println("    Signal wires: " + sigWires);
 
 		// ==================== N-WELL FILL ====================
@@ -953,21 +971,83 @@ public class AnalogLayoutEngine
 		}
 
 		// Phase 2: Route remaining nets via M2 vertical + M3 horizontal
-		// Y-range-aware + net-aware: only offset when DIFFERENT net M2 segments
-		// at same X overlap in Y range
+		// Left-Edge track assignment: nets with non-overlapping X ranges share tracks
 		if (!channelNets.isEmpty())
 		{
 			double viaW23 = m2m3Con != null ? m2m3Con.getDefWidth(ep) : 5;
-			double trackPitch = snap(Math.max(viaW23, m2ColMinDist));
+			double m2Spacing = rules.getLayerSpacing(rules.getMetal2Layer(), rules.getMetal2Layer());
+			double trackPitch = snap(Math.max(viaW23 + m2Spacing, m2ColMinDist));
 			double channelMid = (channelBotY + channelTopY) / 2;
 
+			// Compute X-range for each net (min/max X of its representative ports)
+			List<double[]> netXRanges = new ArrayList<double[]>(); // [minX, maxX]
+			for (CircuitGraph.Net net : channelNets)
+			{
+				List<PortInst> reps = remainingPorts.get(net);
+				double minX = Double.MAX_VALUE, maxX = -Double.MAX_VALUE;
+				if (reps != null)
+				{
+					for (PortInst p : reps)
+					{
+						double x = p.getCenter().getLambdaX();
+						if (x < minX) minX = x;
+						if (x > maxX) maxX = x;
+					}
+				}
+				netXRanges.add(new double[] { minX - viaW23, maxX + viaW23 });
+			}
+
+			// Left-Edge track assignment: assign nets to tracks, reuse when X-ranges don't overlap
+			List<List<Integer>> tracks = new ArrayList<List<Integer>>(); // tracks[trackIdx] = list of net indices
+			List<Integer> netToTrack = new ArrayList<Integer>();
+			for (int ni = 0; ni < channelNets.size(); ni++)
+			{
+				double[] range = netXRanges.get(ni);
+				int assignedTrack = -1;
+
+				// Try to find existing track where this net doesn't overlap
+				for (int ti = 0; ti < tracks.size(); ti++)
+				{
+					boolean canShare = true;
+					for (int existingNet : tracks.get(ti))
+					{
+						double[] existRange = netXRanges.get(existingNet);
+						// Check X-range overlap (with margin)
+						if (range[0] < existRange[1] && existRange[0] < range[1])
+						{
+							canShare = false;
+							break;
+						}
+					}
+					if (canShare)
+					{
+						assignedTrack = ti;
+						break;
+					}
+				}
+
+				if (assignedTrack < 0)
+				{
+					assignedTrack = tracks.size();
+					tracks.add(new ArrayList<Integer>());
+				}
+				tracks.get(assignedTrack).add(ni);
+				netToTrack.add(assignedTrack);
+			}
+
+			int numTracks = tracks.size();
+			System.out.println("    Channel routing: " + channelNets.size() + " nets -> " +
+				numTracks + " tracks (left-edge sharing)");
+
+			// Route each net on its assigned track
 			for (int ni = 0; ni < channelNets.size(); ni++)
 			{
 				CircuitGraph.Net net = channelNets.get(ni);
 				List<PortInst> reps = remainingPorts.get(net);
 				if (reps == null || reps.size() < 2) continue;
 
-				double trackY = snap(channelMid + trackPitch * (ni - (channelNets.size() - 1) / 2.0));
+				int trackIdx = netToTrack.get(ni);
+				double trackY = snap(channelMid + trackPitch * (trackIdx - (numTracks - 1) / 2.0));
 
 				wires += m2m3RouteViaChannel(reps, trackY, m2Segments, m2SegNets, net,
 					m2ColMinDist, m2YMargin, cell);
@@ -975,6 +1055,177 @@ public class AnalogLayoutEngine
 		}
 
 		return wires;
+	}
+
+	// ==================== SEA-OF-GATES SIGNAL ROUTING ====================
+
+	/**
+	 * Route signal nets using Electric's Sea-of-Gates router.
+	 * Creates unrouted arcs for all signal net connections, then invokes
+	 * the SOG engine to perform DRC-clean maze routing.
+	 */
+	private int routeSignalNetsSOG(Map<CircuitGraph.Device, NodeInst> devNodes,
+		Set<CircuitGraph.Net> internalNets, Cell cell)
+	{
+		if (metal1Arc == null) return 0;
+
+		// Build port map with M1 contacts: net -> list of Metal-1 PortInsts
+		// The SOG router needs metal ports — create poly/active contacts first
+		Map<CircuitGraph.Net, List<PortInst>> rawPorts = buildNetPortMap(devNodes, internalNets);
+		Map<CircuitGraph.Net, List<PortInst>> netPorts = new LinkedHashMap<CircuitGraph.Net, List<PortInst>>();
+
+		for (Map.Entry<CircuitGraph.Net, List<PortInst>> entry : rawPorts.entrySet())
+		{
+			List<PortInst> m1Ports = new ArrayList<PortInst>();
+			for (PortInst dp : entry.getValue())
+			{
+				// Create M1 contact at each port (poly contact or active contact)
+				NodeInst devNi = dp.getNodeInst();
+				PortInst m1 = createContactOutsideDevice(dp, devNi, cell);
+				if (m1 != null) m1Ports.add(m1);
+			}
+			if (m1Ports.size() >= 2) netPorts.put(entry.getKey(), m1Ports);
+		}
+
+		// Create unrouted arcs connecting each net's M1 contact ports
+		ArcProto unroutedArc = com.sun.electric.technology.technologies.Generic.tech().unrouted_arc;
+		List<ArcInst> arcsToRoute = new ArrayList<ArcInst>();
+		int connections = 0;
+
+		for (Map.Entry<CircuitGraph.Net, List<PortInst>> entry : netPorts.entrySet())
+		{
+			List<PortInst> ports = entry.getValue();
+			if (ports.size() < 2) continue;
+
+			// Create unrouted arcs in MST order (connect nearest pairs first)
+			List<PortInst> connected = new ArrayList<PortInst>();
+			connected.add(ports.get(0));
+
+			while (connected.size() < ports.size())
+			{
+				PortInst bestFrom = null, bestTo = null;
+				double bestDist = Double.MAX_VALUE;
+
+				for (PortInst from : connected)
+				{
+					for (PortInst to : ports)
+					{
+						if (connected.contains(to)) continue;
+						double dx = from.getCenter().getLambdaX() - to.getCenter().getLambdaX();
+						double dy = from.getCenter().getLambdaY() - to.getCenter().getLambdaY();
+						double dist = Math.abs(dx) + Math.abs(dy);
+						if (dist < bestDist)
+						{
+							bestDist = dist;
+							bestFrom = from;
+							bestTo = to;
+						}
+					}
+				}
+
+				if (bestTo == null) break;
+				connected.add(bestTo);
+
+				try
+				{
+					ArcInst ai = ArcInst.makeInstance(unroutedArc, ep, bestFrom, bestTo);
+					if (ai != null)
+					{
+						arcsToRoute.add(ai);
+						connections++;
+					}
+				}
+				catch (Exception e) { /* skip */ }
+			}
+		}
+
+		System.out.println("    Created " + connections + " unrouted arcs for SOG routing");
+
+		if (arcsToRoute.isEmpty()) return 0;
+
+		// Invoke Sea-of-Gates router
+		try
+		{
+			com.sun.electric.tool.routing.seaOfGates.SeaOfGatesEngine sogEngine =
+				com.sun.electric.tool.routing.seaOfGates.SeaOfGatesEngineFactory.createSeaOfGatesEngine();
+
+			// Set routing preferences
+			com.sun.electric.tool.routing.SeaOfGates.SeaOfGatesOptions sogPrefs =
+				new com.sun.electric.tool.routing.SeaOfGates.SeaOfGatesOptions();
+			sogPrefs.useParallelRoutes = false;
+			sogEngine.setPrefs(sogPrefs);
+
+			// Use Electric's built-in handler for direct cell modification
+			SeaOfGatesEngine.Handler handler =
+				com.sun.electric.tool.routing.seaOfGates.SeaOfGatesHandlers.getDefault(
+					cell, null,
+					com.sun.electric.tool.routing.Routing.SoGContactsStrategy.SOGCONTACTSATTOPLEVEL,
+					null, ep);
+
+			sogEngine.routeIt(handler, cell, false, arcsToRoute);
+
+			// Clean up any remaining unrouted arcs (SOG replaces them with metal)
+			ArcProto unroutedType = com.sun.electric.technology.technologies.Generic.tech().unrouted_arc;
+			List<ArcInst> toKill = new ArrayList<ArcInst>();
+			for (Iterator<ArcInst> it = cell.getArcs(); it.hasNext(); )
+			{
+				ArcInst ai = it.next();
+				if (ai.getProto() == unroutedType) toKill.add(ai);
+			}
+			for (ArcInst ai : toKill)
+			{
+				if (ai.isLinked()) ai.kill();
+			}
+			if (!toKill.isEmpty())
+				System.out.println("    Cleaned up " + toKill.size() + " residual unrouted arcs");
+
+			System.out.println("    SOG routing complete");
+		}
+		catch (Exception e)
+		{
+			System.out.println("    SOG routing failed: " + e.getMessage());
+			// Remove unrouted arcs before falling back
+			for (ArcInst ai : arcsToRoute)
+			{
+				if (ai.isLinked()) ai.kill();
+			}
+			System.out.println("    Falling back to channel routing");
+			return wireSignalNets(devNodes, internalNets, cell);
+		}
+
+		return connections;
+	}
+
+	/**
+	 * Build port map: signal net -> list of layout PortInsts.
+	 * Excludes supply nets and internal series chain nets.
+	 */
+	private Map<CircuitGraph.Net, List<PortInst>> buildNetPortMap(
+		Map<CircuitGraph.Device, NodeInst> devNodes, Set<CircuitGraph.Net> internalNets)
+	{
+		Map<CircuitGraph.Net, List<PortInst>> netPorts =
+			new LinkedHashMap<CircuitGraph.Net, List<PortInst>>();
+
+		for (CircuitGraph.Net net : graph.getSignalNets())
+		{
+			if (net.isSupply()) continue;
+
+			List<PortInst> m1Ports = new ArrayList<PortInst>();
+			for (CircuitGraph.Pin pin : net.getPins())
+			{
+				if (isInternalSeriesPin(pin, internalNets)) continue;
+
+				NodeInst ni = devNodes.get(pin.getDevice());
+				if (ni == null) continue;
+				String pn = layoutPortName(pin);
+				if (pn == null) continue;
+				PortInst dp = findPort(ni, pn);
+				if (dp == null) continue;
+				m1Ports.add(dp);
+			}
+			if (m1Ports.size() >= 2) netPorts.put(net, m1Ports);
+		}
+		return netPorts;
 	}
 
 	/**
@@ -1095,23 +1346,24 @@ public class AnalogLayoutEngine
 			double segYMin = Math.min(py, trackY);
 			double segYMax = Math.max(py, trackY);
 
-			// Step 1: Find clear M2 column — skip same-net segments, only check OTHER nets
+			// Step 1: Find clear M2 column with limited offset
 			double m2X = px;
+			double step = Math.max(m2ColMinDist, via2MinDist);
 			if (!isSegmentFree(px, segYMin, segYMax, m2Segments, m2SegNets, currentNet,
 				m2ColMinDist, m2YMargin) || !isVia2Clear(px, via2TrackXs, via2MinDist))
 			{
 				boolean found = false;
-				double step = Math.max(m2ColMinDist, via2MinDist);
-				for (int attempt = 1; attempt <= 10; attempt++)
+				for (int attempt = 1; attempt <= 5; attempt++)
 				{
-					double tryLeft = snap(px - step * attempt);
-					if (isSegmentFree(tryLeft, segYMin, segYMax, m2Segments, m2SegNets, currentNet,
-						m2ColMinDist, m2YMargin) && isVia2Clear(tryLeft, via2TrackXs, via2MinDist))
-					{ m2X = tryLeft; found = true; break; }
+					// Try right first (typically more open space)
 					double tryRight = snap(px + step * attempt);
 					if (isSegmentFree(tryRight, segYMin, segYMax, m2Segments, m2SegNets, currentNet,
 						m2ColMinDist, m2YMargin) && isVia2Clear(tryRight, via2TrackXs, via2MinDist))
 					{ m2X = tryRight; found = true; break; }
+					double tryLeft = snap(px - step * attempt);
+					if (isSegmentFree(tryLeft, segYMin, segYMax, m2Segments, m2SegNets, currentNet,
+						m2ColMinDist, m2YMargin) && isVia2Clear(tryLeft, via2TrackXs, via2MinDist))
+					{ m2X = tryLeft; found = true; break; }
 				}
 			}
 			m2Segments.add(new double[] { m2X, segYMin, segYMax });

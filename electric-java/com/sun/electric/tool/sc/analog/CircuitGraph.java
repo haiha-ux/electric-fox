@@ -375,6 +375,99 @@ public class CircuitGraph
 	}
 
 	/**
+	 * Flatten all sub-circuits into this graph by merging their devices and nets.
+	 * Sub-circuit ports are connected to parent nets via shared net merging.
+	 * After flattening, all devices are at the top level for global optimization.
+	 */
+	public void flatten()
+	{
+		if (subCircuits.isEmpty()) return;
+
+		for (SubCircuit sc : new ArrayList<>(subCircuits))
+		{
+			CircuitGraph child = sc.getChildGraph();
+
+			// Recursively flatten children first
+			child.flatten();
+
+			String prefix = sc.getInstanceName() + "_";
+
+			// Map child nets to parent nets (via port connections)
+			Map<Net, Net> childToParent = new HashMap<>();
+			for (Map.Entry<String, Net> portEntry : sc.getPortNets().entrySet())
+			{
+				String portName = portEntry.getKey();
+				Net parentNet = portEntry.getValue();
+
+				// Find the child net connected to this port
+				for (Port p : child.getPorts())
+				{
+					if (p.getName().equalsIgnoreCase(portName) && p.getNet() != null)
+					{
+						childToParent.put(p.getNet(), parentNet);
+						break;
+					}
+				}
+			}
+
+			// Also map child supply nets to parent supply nets by name
+			for (Net childNet : child.getNets())
+			{
+				if (childToParent.containsKey(childNet)) continue;
+				if (childNet.isPower())
+				{
+					Net parentVdd = findSupplyNet(Net.Type.POWER);
+					if (parentVdd != null) childToParent.put(childNet, parentVdd);
+				}
+				else if (childNet.isGround())
+				{
+					Net parentGnd = findSupplyNet(Net.Type.GROUND);
+					if (parentGnd != null) childToParent.put(childNet, parentGnd);
+				}
+			}
+
+			// Merge child devices into parent
+			for (Device childDev : child.getDevices())
+			{
+				String newName = prefix + childDev.getName();
+				Device parentDev = addDevice(newName, childDev.getType());
+				parentDev.setWidth(childDev.getWidth());
+				parentDev.setLength(childDev.getLength());
+				parentDev.setFingers(childDev.getFingers());
+				parentDev.setModelName(childDev.getModelName());
+
+				// Re-connect pins to parent nets
+				for (Pin childPin : childDev.getPins())
+				{
+					Net childNet = childPin.getNet();
+					Net parentNet = childToParent.get(childNet);
+					if (parentNet == null)
+					{
+						// Internal net — create in parent with prefixed name
+						String intNetName = prefix + childNet.getName();
+						parentNet = getOrCreateNet(intNetName);
+						parentNet.setType(childNet.getType());
+						childToParent.put(childNet, parentNet);
+					}
+					connect(parentDev, childPin.getFunction(), parentNet);
+				}
+			}
+		}
+
+		// Clear sub-circuits after flattening
+		subCircuits.clear();
+		System.out.println("  Flattened: " + devices.size() + " devices, " + nets.size() + " nets");
+	}
+
+	/** Find first supply net of given type */
+	private Net findSupplyNet(Net.Type type)
+	{
+		for (Net n : nets)
+			if (n.getType() == type) return n;
+		return null;
+	}
+
+	/**
 	 * Get or create a net by name.
 	 */
 	public Net getOrCreateNet(String name)
