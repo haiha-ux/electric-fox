@@ -128,7 +128,22 @@ public class TruthTablePanel extends JPanel
 
         JPanel bottomPanel = new JPanel(new BorderLayout());
         JButton analyzeBtn = new JButton("Analyze");
-        analyzeBtn.addActionListener(e -> analyzeFromPanels());
+        analyzeBtn.addActionListener(e -> {
+            statusLabel.setText("Analyzing...");
+            analyzeBtn.setEnabled(false);
+            new javax.swing.SwingWorker<Void, Void>()
+            {
+                protected Void doInBackground()
+                {
+                    analyzeFromPanels();
+                    return null;
+                }
+                protected void done()
+                {
+                    analyzeBtn.setEnabled(true);
+                }
+            }.execute();
+        });
         bottomPanel.add(statusLabel, BorderLayout.CENTER);
         bottomPanel.add(analyzeBtn, BorderLayout.EAST);
         add(bottomPanel, BorderLayout.SOUTH);
@@ -222,21 +237,25 @@ public class TruthTablePanel extends JPanel
     {
         if (inputSignals.isEmpty() || outputSignals.isEmpty())
         {
-            tableModel.setRowCount(0);
-            tableModel.setColumnCount(0);
-            statusLabel.setText(inputSignals.size() + " inputs, " + outputSignals.size() + " outputs");
+            javax.swing.SwingUtilities.invokeLater(() -> {
+                tableModel.setRowCount(0);
+                tableModel.setColumnCount(0);
+                statusLabel.setText(inputSignals.size() + " inputs, " + outputSignals.size() + " outputs");
+            });
             return;
         }
 
         // Build column names
-        String[] columns = new String[inputSignals.size() + outputSignals.size()];
+        final String[] columns = new String[inputSignals.size() + outputSignals.size()];
         for (int i = 0; i < inputSignals.size(); i++)
             columns[i] = inputSignals.get(i).getSignalName();
         for (int i = 0; i < outputSignals.size(); i++)
             columns[inputSignals.size() + i] = outputSignals.get(i).getSignalName();
 
-        tableModel.setColumnIdentifiers(columns);
-        tableModel.setRowCount(0);
+        javax.swing.SwingUtilities.invokeLater(() -> {
+            tableModel.setColumnIdentifiers(columns);
+            tableModel.setRowCount(0);
+        });
 
         // Collect all time points where inputs change
         List<Signal<?>> allSignals = new ArrayList<>(inputSignals);
@@ -257,37 +276,35 @@ public class TruthTablePanel extends JPanel
             return;
         }
 
-        // Sample at each change time, deduplicate rows
-        Set<String> seenRows = new LinkedHashSet<>();
+        // Sample at each change time, deduplicate by input combination
+        // Optimization: skip sampling outputs if input combo already seen
+        Set<String> seenInputs = new HashSet<>();
         List<String[]> rows = new ArrayList<>();
+        int maxRows = 256; // limit for UI performance (2^8 max inputs)
 
         for (double time : changeTimes)
         {
-            String[] row = new String[columns.length];
-            StringBuilder rowKey = new StringBuilder();
+            if (rows.size() >= maxRows) break; // prevent huge tables
 
-            // Sample inputs
+            // Sample inputs only first
+            String[] row = new String[columns.length];
+            StringBuilder inputKey = new StringBuilder();
             for (int i = 0; i < inputSignals.size(); i++)
             {
                 row[i] = sampleSignal(inputSignals.get(i), time);
-                rowKey.append(row[i]);
+                inputKey.append(row[i]);
             }
 
-            // Skip if we've seen this input combination
-            String inputKey = rowKey.toString();
-            // Sample outputs for this input combination
+            // Skip if we've already seen this input combination
+            String key = inputKey.toString();
+            if (seenInputs.contains(key)) continue;
+            seenInputs.add(key);
+
+            // Now sample outputs (only for new input combinations)
             for (int i = 0; i < outputSignals.size(); i++)
-            {
                 row[inputSignals.size() + i] = sampleSignal(outputSignals.get(i), time);
-                rowKey.append("|").append(row[inputSignals.size() + i]);
-            }
 
-            String fullKey = rowKey.toString();
-            if (!seenRows.contains(inputKey))
-            {
-                seenRows.add(inputKey);
-                rows.add(row);
-            }
+            rows.add(row);
         }
 
         // Sort rows by input binary value
@@ -301,12 +318,15 @@ public class TruthTablePanel extends JPanel
             return 0;
         });
 
-        // Add to table
-        for (String[] row : rows)
-            tableModel.addRow(row);
-
-        statusLabel.setText(inputSignals.size() + " inputs, " + outputSignals.size() +
-            " outputs, " + rows.size() + " unique rows (Vth=" + threshold + "V)");
+        // Add to table (must be on EDT)
+        final List<String[]> finalRows = rows;
+        final String statusMsg = inputSignals.size() + " inputs, " + outputSignals.size() +
+            " outputs, " + rows.size() + " unique rows (Vth=" + threshold + "V)";
+        javax.swing.SwingUtilities.invokeLater(() -> {
+            for (String[] row : finalRows)
+                tableModel.addRow(row);
+            statusLabel.setText(statusMsg);
+        });
     }
 
     /**

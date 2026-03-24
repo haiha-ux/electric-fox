@@ -431,6 +431,29 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 			public void actionPerformed(ActionEvent evt) { growPanels(0.8); }
 		});
 
+		// Panel reorder buttons
+		JButton panelUpBtn = new JButton("\u25B2"); // ▲
+		panelUpBtn.setFont(panelUpBtn.getFont().deriveFont(9f));
+		styleWaveformButton(panelUpBtn);
+		panelUpBtn.setToolTipText("Move selected panel up");
+		panelUpBtn.setPreferredSize(new Dimension(28, 24));
+		gbc = new GridBagConstraints();
+		gbc.gridx = 8;       gbc.gridy = 0;
+		gbc.anchor = GridBagConstraints.CENTER;
+		overall.add(panelUpBtn, gbc);
+		panelUpBtn.addActionListener(e -> moveSelectedPanel(true));
+
+		JButton panelDownBtn = new JButton("\u25BC"); // ▼
+		panelDownBtn.setFont(panelDownBtn.getFont().deriveFont(9f));
+		styleWaveformButton(panelDownBtn);
+		panelDownBtn.setToolTipText("Move selected panel down");
+		panelDownBtn.setPreferredSize(new Dimension(28, 24));
+		gbc = new GridBagConstraints();
+		gbc.gridx = 8;       gbc.gridy = 1;
+		gbc.anchor = GridBagConstraints.CENTER;
+		overall.add(panelDownBtn, gbc);
+		panelDownBtn.addActionListener(e -> moveSelectedPanel(false));
+
 		// Truth Table toggle button
 		JButton truthTableBtn = new JButton("Truth Table");
 		truthTableBtn.setFont(truthTableBtn.getFont().deriveFont(10f));
@@ -3889,6 +3912,34 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 	 * Toggle the truth table panel on the right side of the waveform window.
 	 * When shown, analyzes all displayed signals to build a truth table.
 	 */
+	/**
+	 * Move the selected panel up or down in the panel list.
+	 * @param up true to move up (earlier in list), false to move down
+	 */
+	public void moveSelectedPanel(boolean up)
+	{
+		for (int i = 0; i < wavePanels.size(); i++)
+		{
+			Panel wp = wavePanels.get(i);
+			if (wp.isSelected())
+			{
+				int newIndex = up ? i - 1 : i + 1;
+				if (newIndex < 0 || newIndex >= wavePanels.size()) return;
+
+				// Swap panels
+				wavePanels.set(i, wavePanels.get(newIndex));
+				wavePanels.set(newIndex, wp);
+
+				// Rebuild the table display
+				rebuildPanelList();
+				overall.validate();
+				table.repaint();
+				saveSignalOrder();
+				return;
+			}
+		}
+	}
+
 	public void toggleTruthTable()
 	{
 		boolean visible = !truthTablePanel.isVisible();
@@ -3912,35 +3963,47 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 	 */
 	public void addSignal(Signal<?> sig)
 	{
-        // add signal on top of current panel
-        Signal<?> as = sig;
-        boolean found = false;
-        if (!sig.isDigital())
-        {
-	        for(Panel wp : wavePanels)
-	        {
-	            if (wp.isSelected())
-	            {
-	                WaveSignal.addSignalToPanel(sig, wp, null);
-	                if (getMainHorizRuler() != null)
-	                    getMainHorizRuler().repaint();
-	                found = true;
-	                break;
-	            }
-	        }
-        }
-        if (!found)
-        {
-            // create a new panel for the signal
-            Panel wp = makeNewPanel(-1);
-            wp.fitToSignal(as);
-            if (!xAxisLocked)
-                wp.setXAxisRange(as.getMinTime(), as.getMaxTime());
-            WaveSignal.addSignalToPanel(sig, wp, null);
-            if (getMainHorizRuler() != null)
-                getMainHorizRuler().repaint();
-        }
-        overall.validate();
+		addSignal(sig, false);
+	}
+
+	/**
+	 * Add a signal to the display.
+	 * @param sig the Signal to add
+	 * @param forceNewPanel if true, always create a new panel; if false, add to selected panel
+	 */
+	public void addSignal(Signal<?> sig, boolean forceNewPanel)
+	{
+		Signal<?> as = sig;
+		boolean found = false;
+
+		// Shift-click or forceNewPanel=true → always new panel
+		// Otherwise → add to selected panel if one exists
+		if (!forceNewPanel)
+		{
+			for (Panel wp : wavePanels)
+			{
+				if (wp.isSelected())
+				{
+					WaveSignal.addSignalToPanel(sig, wp, null);
+					if (getMainHorizRuler() != null)
+						getMainHorizRuler().repaint();
+					found = true;
+					break;
+				}
+			}
+		}
+		if (!found)
+		{
+			// Create a new panel for the signal
+			Panel wp = makeNewPanel(-1);
+			wp.fitToSignal(as);
+			if (!xAxisLocked)
+				wp.setXAxisRange(as.getMinTime(), as.getMaxTime());
+			WaveSignal.addSignalToPanel(sig, wp, null);
+			if (getMainHorizRuler() != null)
+				getMainHorizRuler().repaint();
+		}
+		overall.validate();
 		saveSignalOrder();
 	}
 
