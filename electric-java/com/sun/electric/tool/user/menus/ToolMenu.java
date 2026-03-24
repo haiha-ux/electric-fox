@@ -2512,6 +2512,9 @@ public class ToolMenu {
 		private Library destLib;
 		private EditingPreferences ep;
 
+		/** Public wrapper for protected setProgress */
+		public void reportProgress(String msg) { setProgress(msg); }
+
 		private AnalogLayoutSynthesisJob(Cell schematicCell, String spiceFile, Library destLib, EditingPreferences ep)
 		{
 			super("Analog Layout Synthesis", User.getUserTool(), Job.Type.CHANGE, null, null, Job.Priority.USER);
@@ -2528,15 +2531,24 @@ public class ToolMenu {
 			Technology tech = Technology.getCurrent();
 			if (tech == null || tech.isLayout() == false)
 			{
-				// Fall back to user's default technology or mocmos
 				String defTech = User.getDefaultTechnology();
 				tech = Technology.findTechnology(defTech);
 				if (tech == null) tech = Technology.findTechnology("mocmos");
 			}
+
+			setProgress("ALSE: Initializing...");
 			System.out.println("ALSE: Using technology: " + (tech != null ? tech.getTechName() : "null"));
+
 			com.sun.electric.tool.sc.analog.AnalogLayoutEngine engine =
 				new com.sun.electric.tool.sc.analog.AnalogLayoutEngine(tech, ep);
+			engine.setJob(this);
+			// Pass progress callback so ALSE can report to Job status bar
+			final AnalogLayoutSynthesisJob thisJob = this;
+			engine.setProgressCallback(new com.sun.electric.tool.sc.analog.AnalogLayoutEngine.ProgressCallback() {
+				public void report(String msg) { thisJob.reportProgress("ALSE: " + msg); }
+			});
 
+			setProgress("ALSE: Extracting circuit...");
 			Cell result;
 			if (schematicCell != null)
 			{
@@ -2550,10 +2562,12 @@ public class ToolMenu {
 
 			if (result != null)
 			{
+				setProgress("ALSE: Complete!");
 				System.out.println("ALSE: Layout cell created: " + result.describe(false));
 			}
 			else
 			{
+				setProgress("ALSE: Failed");
 				System.out.println("ALSE: Synthesis failed");
 			}
 			return true;

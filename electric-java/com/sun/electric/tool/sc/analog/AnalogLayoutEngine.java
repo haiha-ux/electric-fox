@@ -76,6 +76,18 @@ public class AnalogLayoutEngine
 	// Routing channel bounds (set during layout generation)
 	private double channelBotY, channelTopY;
 
+	// Progress callback for tracking pipeline stages
+	public interface ProgressCallback { void report(String msg); }
+	private ProgressCallback progressCallback;
+	private com.sun.electric.tool.Job job;
+	public void setJob(com.sun.electric.tool.Job j) { this.job = j; }
+	public void setProgressCallback(ProgressCallback cb) { this.progressCallback = cb; }
+	private void reportProgress(String msg)
+	{
+		System.out.println("  " + msg);
+		if (progressCallback != null) progressCallback.report(msg);
+	}
+
 	public AnalogLayoutEngine(Technology tech, EditingPreferences ep)
 	{
 		this.tech = tech;
@@ -153,22 +165,26 @@ public class AnalogLayoutEngine
 
 	private Cell runPipeline(String cellName, Library destLib)
 	{
+		reportProgress("Technology rules extraction...");
 		rules = new TechRules(tech, ep);
 		rules.printRuleSummary();
 		initTechPrimitives();
 		graph.printStats();
 
+		reportProgress("Constraint extraction (" + graph.getDevices().size() + " devices)...");
 		constraints = new ConstraintExtractor(graph);
 		constraints.extractAll();
 
+		reportProgress("Device sizing...");
 		devGen = new DeviceGenerator(tech, ep);
 		computeDeviceSizes();
 
+		reportProgress("Placement (SA optimization, " + graph.getDevices().size() + " devices)...");
 		AnalogPlacer placer = new AnalogPlacer(graph, constraints);
 		placement = placer.place();
 		if (placement == null || placement.isEmpty()) { System.out.println("ALSE ERROR: Placement failed"); return null; }
 
-		// Compact placement to minimize area
+		reportProgress("Layout compaction...");
 		compactPlacement();
 
 		AnalogRouter router = new AnalogRouter(graph, placement);
@@ -1144,6 +1160,7 @@ public class AnalogLayoutEngine
 			}
 		}
 
+		reportProgress("Routing " + connections + " signal connections (Sea-of-Gates)...");
 		System.out.println("    Created " + connections + " unrouted arcs for SOG routing");
 
 		if (arcsToRoute.isEmpty()) return 0;
@@ -1158,8 +1175,7 @@ public class AnalogLayoutEngine
 			com.sun.electric.tool.routing.SeaOfGates.SeaOfGatesOptions sogPrefs =
 				new com.sun.electric.tool.routing.SeaOfGates.SeaOfGatesOptions();
 			sogPrefs.useParallelRoutes = false;
-			sogPrefs.complexityLimit = 500000; // higher for complex designs
-			sogPrefs.reRunFailedRoutes = true;  // retry failed routes with higher limit
+			sogPrefs.complexityLimit = 300000; // higher quality, progress dialog keeps user informed
 			sogEngine.setPrefs(sogPrefs);
 
 			// Configure cell parameters: force grid alignment on all metal arcs
@@ -1172,11 +1188,12 @@ public class AnalogLayoutEngine
 			}
 
 			// Use Electric's built-in handler for direct cell modification
+			// Pass the Job so SOG can report progress to the UI dialog
 			SeaOfGatesEngine.Handler handler =
 				com.sun.electric.tool.routing.seaOfGates.SeaOfGatesHandlers.getDefault(
 					cell, null,
 					com.sun.electric.tool.routing.Routing.SoGContactsStrategy.SOGCONTACTSATTOPLEVEL,
-					null, ep);
+					job, ep);
 
 			sogEngine.routeIt(handler, cell, false, arcsToRoute, sogParams);
 
