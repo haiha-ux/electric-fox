@@ -2717,21 +2717,10 @@ public abstract class SeaOfGatesEngine
 			double yOffset = so.getLowYOffset() + so.getHighYOffset();
 			double conWid = Math.max(np.getDefWidth(ep) - xOffset, minWid) + xOffset;
 			double conHei = Math.max(np.getDefHeight(ep) - yOffset, minHei) + yOffset;
-			// Cap via expansion to prevent multicuts from exceeding DRC max cut size.
-			// The default node size already satisfies DRC; expanding beyond it can
-			// create oversized cut layers (e.g., Via5 > 3 lambda max).
-			double maxConWid = np.getDefWidth(ep);
-			double maxConHei = np.getDefHeight(ep);
-			if (mv.horMetal >= 0)
-			{
-				double arcWid = getArcWidth(mv.horMetal, x, y, lastX, lastY) + mv.horMetalInset;
-				if (arcWid > conHei) conHei = Math.min(arcWid, maxConHei);
-			}
-			if (mv.verMetal >= 0)
-			{
-				double arcWid = getArcWidth(mv.verMetal, x, y, lastX, lastY) + mv.verMetalInset;
-				if (arcWid > conWid) conWid = Math.min(arcWid, maxConWid);
-			}
+			// Do NOT expand via node beyond its default size.
+			// Expanding causes multicuts to exceed DRC max cut size rules.
+			// The metal arc width may be wider than the via, but the via
+			// contact node should stay at its technology-defined default.
 			wid.setValue(conWid);
 			hei.setValue(conHei);
 			return orient;

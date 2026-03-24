@@ -1158,6 +1158,8 @@ public class AnalogLayoutEngine
 			com.sun.electric.tool.routing.SeaOfGates.SeaOfGatesOptions sogPrefs =
 				new com.sun.electric.tool.routing.SeaOfGates.SeaOfGatesOptions();
 			sogPrefs.useParallelRoutes = false;
+			sogPrefs.complexityLimit = 500000; // higher for complex designs
+			sogPrefs.reRunFailedRoutes = true;  // retry failed routes with higher limit
 			sogEngine.setPrefs(sogPrefs);
 
 			// Configure cell parameters: force grid alignment on all metal arcs
