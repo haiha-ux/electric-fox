@@ -23,6 +23,7 @@
 package com.sun.electric.tool.sc.analog;
 
 import com.sun.electric.database.hierarchy.Cell;
+import com.sun.electric.database.prototype.PortProto;
 import com.sun.electric.database.hierarchy.Export;
 import com.sun.electric.database.hierarchy.Nodable;
 import com.sun.electric.database.network.Netlist;
@@ -102,8 +103,33 @@ public class CircuitGraphBuilder
 			Nodable no = it.next();
 			NodeProto np = no.getProto();
 
-			// Skip non-primitive nodes (cell instances handled as subcircuits)
-			if (no.isCellInstance()) continue;
+			// Handle cell instances: recursively extract sub-circuit graph
+			if (no.isCellInstance())
+			{
+				Cell subCell = (Cell) np;
+				// Find schematic view if this is an icon
+				Cell schemView = subCell.isSchematic() ? subCell : subCell.getEquivalent();
+				if (schemView != null && schemView.isSchematic())
+				{
+					// Avoid infinite recursion: track visited cells
+					String cellKey = schemView.describe(false);
+					CircuitGraph childGraph = fromCell(schemView);
+					if (childGraph != null && (childGraph.getDevices().size() > 0 || childGraph.getSubCircuits().size() > 0))
+					{
+						CircuitGraph.SubCircuit sc = graph.addSubCircuit(no.getName(), cellKey, childGraph);
+						// Map sub-cell ports to parent nets
+						for (Iterator<PortProto> pIt = np.getPorts(); pIt.hasNext(); )
+						{
+							PortProto pp = pIt.next();
+							Network nw = netlist.getNetwork(no, pp, 0);
+							CircuitGraph.Net parentNet = netMap.get(nw);
+							if (parentNet != null)
+								sc.mapPort(pp.getName(), parentNet);
+						}
+					}
+				}
+				continue;
+			}
 
 			NodeInst ni = no.getNodeInst();
 			PrimitiveNode.Function func = ni.getFunction();

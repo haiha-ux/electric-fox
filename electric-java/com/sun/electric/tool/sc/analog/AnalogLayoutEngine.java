@@ -83,11 +83,62 @@ public class AnalogLayoutEngine
 
 	public Cell synthesizeFromCell(Cell schematicCell, Library destLib)
 	{
-		System.out.println("=== ALSE: Analog Layout Synthesis Engine v2 ===");
+		System.out.println("=== ALSE: Analog Layout Synthesis Engine v3 ===");
 		System.out.println("  Input: " + schematicCell.describe(false));
 		graph = CircuitGraphBuilder.fromCell(schematicCell);
 		if (graph == null) { System.out.println("ALSE ERROR: Failed to build circuit graph"); return null; }
+
+		// Hierarchical bottom-up: synthesize sub-cell layouts first
+		if (graph.isHierarchical())
+		{
+			System.out.println("  Hierarchical design: " + graph.getSubCircuits().size() +
+				" sub-cells, " + graph.getTotalDeviceCount() + " total devices");
+			synthesizeSubCells(graph, destLib);
+		}
+
 		return runPipeline(schematicCell.getName(), destLib);
+	}
+
+	/**
+	 * Recursively synthesize layouts for all sub-circuits, bottom-up.
+	 * Each sub-cell gets its own layout cell, which can then be instantiated
+	 * in the parent layout.
+	 */
+	private void synthesizeSubCells(CircuitGraph parentGraph, Library destLib)
+	{
+		for (CircuitGraph.SubCircuit sc : parentGraph.getSubCircuits())
+		{
+			CircuitGraph childGraph = sc.getChildGraph();
+			String childName = sc.getCellName().replaceAll("[^a-zA-Z0-9_]", "_");
+
+			// Check if layout already exists (avoid re-synthesizing shared cells)
+			Cell existing = destLib.findNodeProto(childName + "{lay}");
+			if (existing != null)
+			{
+				System.out.println("  SubCell " + sc.getInstanceName() + " (" + childName +
+					"): layout already exists, reusing");
+				sc.setLayoutWidth(existing.getDefWidth());
+				sc.setLayoutHeight(existing.getDefHeight());
+				continue;
+			}
+
+			// Recursively synthesize children first
+			if (childGraph.isHierarchical())
+				synthesizeSubCells(childGraph, destLib);
+
+			// Synthesize this sub-cell's layout
+			System.out.println("  Synthesizing sub-cell layout: " + childName);
+			AnalogLayoutEngine subEngine = new AnalogLayoutEngine(tech, ep);
+			subEngine.graph = childGraph;
+			Cell subLayout = subEngine.runPipeline(childName, destLib);
+			if (subLayout != null)
+			{
+				sc.setLayoutWidth(subLayout.getDefWidth());
+				sc.setLayoutHeight(subLayout.getDefHeight());
+				System.out.println("  SubCell " + childName + " layout: " +
+					fmt(subLayout.getDefWidth()) + " x " + fmt(subLayout.getDefHeight()));
+			}
+		}
 	}
 
 	public Cell synthesizeFromSpice(String spiceFile, String subcktName, Library destLib)
@@ -115,6 +166,9 @@ public class AnalogLayoutEngine
 		AnalogPlacer placer = new AnalogPlacer(graph, constraints);
 		placement = placer.place();
 		if (placement == null || placement.isEmpty()) { System.out.println("ALSE ERROR: Placement failed"); return null; }
+
+		// Compact placement to minimize area
+		compactPlacement();
 
 		AnalogRouter router = new AnalogRouter(graph, placement);
 		routes = router.routeAll();
@@ -166,6 +220,40 @@ public class AnalogLayoutEngine
 				dev.setLayoutHeight(prim.getDefHeight(ep));
 			}
 			else devGen.estimateDeviceSize(dev);
+		}
+	}
+
+	// ==================== LAYOUT COMPACTION ====================
+
+	/**
+	 * Apply 1D constraint-graph compaction to the placement to minimize area.
+	 * Uses the device spacing from TechRules as the minimum constraint distance.
+	 */
+	private void compactPlacement()
+	{
+		if (placement == null || placement.isEmpty()) return;
+
+		LayoutCompactor compactor = new LayoutCompactor(rules.getDeviceSpacing());
+
+		// Add all placed devices as compaction elements
+		Map<CircuitGraph.Device, LayoutCompactor.Element> elemMap = new LinkedHashMap<>();
+		for (Map.Entry<CircuitGraph.Device, double[]> entry : placement.entrySet())
+		{
+			CircuitGraph.Device dev = entry.getKey();
+			double[] pos = entry.getValue();
+			LayoutCompactor.Element elem = compactor.addElement(dev.getName(),
+				pos[0], pos[1], dev.getLayoutWidth(), dev.getLayoutHeight());
+			elemMap.put(dev, elem);
+		}
+
+		// Run compaction
+		compactor.compact();
+
+		// Apply compacted positions back to placement
+		for (Map.Entry<CircuitGraph.Device, LayoutCompactor.Element> entry : elemMap.entrySet())
+		{
+			LayoutCompactor.Element elem = entry.getValue();
+			placement.put(entry.getKey(), new double[]{elem.x, elem.y});
 		}
 	}
 

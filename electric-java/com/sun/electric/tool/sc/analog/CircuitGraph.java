@@ -48,6 +48,7 @@ public class CircuitGraph
 	private final Map<String, Net> netsByName = new LinkedHashMap<String, Net>();
 	private final Map<String, Device> devicesByName = new LinkedHashMap<String, Device>();
 	private final List<Port> ports = new ArrayList<Port>(); // external ports
+	private final List<SubCircuit> subCircuits = new ArrayList<SubCircuit>(); // hierarchical sub-cells
 
 	// ==================== DEVICE (transistor, resistor, capacitor, etc.) ====================
 
@@ -289,6 +290,55 @@ public class CircuitGraph
 		public void setNet(Net n) { this.net = n; }
 	}
 
+	// ==================== SUBCIRCUIT (hierarchical child) ====================
+
+	/**
+	 * A hierarchical sub-circuit instance with its own CircuitGraph.
+	 * Represents a cell instance in the schematic that has been recursively
+	 * extracted. The sub-circuit has ports that map to nets in the parent graph.
+	 */
+	public static class SubCircuit
+	{
+		private final String instanceName;      // instance name in parent
+		private final String cellName;           // cell/definition name
+		private final CircuitGraph childGraph;   // recursively extracted child
+		private final Map<String, Net> portNets; // port name -> parent net mapping
+		private double layoutWidth = -1;
+		private double layoutHeight = -1;
+		private double placedX, placedY;         // placement position
+
+		public SubCircuit(String instanceName, String cellName, CircuitGraph childGraph)
+		{
+			this.instanceName = instanceName;
+			this.cellName = cellName;
+			this.childGraph = childGraph;
+			this.portNets = new LinkedHashMap<String, Net>();
+		}
+
+		public String getInstanceName() { return instanceName; }
+		public String getCellName() { return cellName; }
+		public CircuitGraph getChildGraph() { return childGraph; }
+		public Map<String, Net> getPortNets() { return portNets; }
+		public void mapPort(String portName, Net parentNet) { portNets.put(portName, parentNet); }
+
+		public double getLayoutWidth() { return layoutWidth; }
+		public void setLayoutWidth(double w) { this.layoutWidth = w; }
+		public double getLayoutHeight() { return layoutHeight; }
+		public void setLayoutHeight(double h) { this.layoutHeight = h; }
+		public double getPlacedX() { return placedX; }
+		public void setPlacedX(double x) { this.placedX = x; }
+		public double getPlacedY() { return placedY; }
+		public void setPlacedY(double y) { this.placedY = y; }
+
+		@Override
+		public String toString()
+		{
+			return "SubCircuit " + instanceName + " (" + cellName + ", " +
+				childGraph.getDevices().size() + " devices, " +
+				childGraph.getSubCircuits().size() + " sub-cells)";
+		}
+	}
+
 	// ==================== GRAPH CONSTRUCTION ====================
 
 	public CircuitGraph(String name)
@@ -300,6 +350,29 @@ public class CircuitGraph
 	public List<Device> getDevices() { return devices; }
 	public List<Net> getNets() { return nets; }
 	public List<Port> getPorts() { return ports; }
+	public List<SubCircuit> getSubCircuits() { return subCircuits; }
+	public boolean isHierarchical() { return !subCircuits.isEmpty(); }
+
+	/**
+	 * Add a sub-circuit instance to the graph.
+	 */
+	public SubCircuit addSubCircuit(String instanceName, String cellName, CircuitGraph childGraph)
+	{
+		SubCircuit sc = new SubCircuit(instanceName, cellName, childGraph);
+		subCircuits.add(sc);
+		return sc;
+	}
+
+	/**
+	 * Get total device count including all sub-circuits recursively.
+	 */
+	public int getTotalDeviceCount()
+	{
+		int count = devices.size();
+		for (SubCircuit sc : subCircuits)
+			count += sc.childGraph.getTotalDeviceCount();
+		return count;
+	}
 
 	/**
 	 * Get or create a net by name.
@@ -533,5 +606,12 @@ public class CircuitGraph
 			" (NMOS=" + nmos + " PMOS=" + pmos + " R=" + res + " C=" + cap + " other=" + other + ")");
 		System.out.println("    Nets: " + nets.size() + " (signal=" + getSignalNets().size() + ")");
 		System.out.println("    Ports: " + ports.size());
+		if (!subCircuits.isEmpty())
+		{
+			System.out.println("    SubCircuits: " + subCircuits.size() +
+				" (total devices incl. hierarchy: " + getTotalDeviceCount() + ")");
+			for (SubCircuit sc : subCircuits)
+				System.out.println("      " + sc);
+		}
 	}
 }
