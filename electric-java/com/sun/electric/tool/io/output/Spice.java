@@ -1694,6 +1694,19 @@ public class Spice extends Topology
 		{
 			boolean firstDecl = true;
 			boolean isSubCell = (cell != topCell);
+			// For top cell: check if SpiceSimSetup provides sources — if so, skip SPICE_CARD sources
+			boolean topHasSetup = false;
+			if (!isSubCell)
+			{
+				String setupCode = com.sun.electric.tool.user.dialogs.SpiceSimSetup.getCurrentSetupCode();
+				if (setupCode != null && !setupCode.trim().isEmpty()) topHasSetup = true;
+				if (!topHasSetup)
+				{
+					Variable setupVar = cell.getVar(SPICE_SIM_SETUP_KEY);
+					if (setupVar != null && setupVar.getObject() != null) topHasSetup = true;
+				}
+			}
+
 			for(Iterator<NodeInst> it = cell.getNodes(); it.hasNext(); )
 			{
 				NodeInst ni = it.next();
@@ -1701,9 +1714,9 @@ public class Spice extends Topology
 				Variable cardVar = ni.getVar(SPICE_CARD_KEY);
 				if (cardVar == null) continue;
 
-				// For sub-cells: skip voltage sources and analysis commands
-				// These should only appear at top level to avoid duplicates
-				if (isSubCell && isTopLevelOnlySpice(cardVar))
+				// Skip voltage sources/analysis commands in sub-cells (avoid duplicates)
+				// Also skip in top cell if SpiceSimSetup provides its own sources
+				if ((isSubCell || topHasSetup) && isTopLevelOnlySpice(cardVar))
 					continue;
 
 				if (firstDecl)
