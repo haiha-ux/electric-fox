@@ -130,8 +130,20 @@ abstract class BTreeSignal<S extends Sample> extends MutableSignal<S>
 
 		public BTreeRasterView(double t0, double t1, int numRegions)
 		{
-			Double t0_ = new Double(Math.min(t0, t1));
-			Double t1_ = new Double(Math.max(t0, t1));
+			// Guard against empty tree
+			if (tree.size() == 0)
+			{
+				this.t0 = t0;
+				this.t1 = t1;
+				this.numRegions = 0;
+				this.exact = true;
+				t0_ord = 0;
+				t1_ord = 0;
+				return;
+			}
+
+			Double t0_ = Double.valueOf(Math.min(t0, t1));
+			Double t1_ = Double.valueOf(Math.max(t0, t1));
 			t0_ord = tree.getOrdFromKeyFloor(t0_);
 			t1_ord = tree.getOrdFromKeyFloor(t1_);
 
@@ -143,8 +155,8 @@ abstract class BTreeSignal<S extends Sample> extends MutableSignal<S>
 			t0_ord = Math.max(t0_ord, 0);
 			t1_ord = Math.min(t1_ord, tree.size()-1);
 
-			this.t0 = t0_.doubleValue();
-			this.t1 = t1_.doubleValue();
+			this.t0 = (t0_ != null) ? t0_.doubleValue() : t0;
+			this.t1 = (t1_ != null) ? t1_.doubleValue() : t1;
 
 			// There is a bug in the BTree code which produces inaccurate sampling if the actual number
 			// of samples is close, but slightly greater than the requested number.  So, for example,
