@@ -575,25 +575,26 @@ public class Spice extends Topology
 	private boolean isTopLevelOnlySpice(Variable cardVar)
 	{
 		if (cardVar == null) return false;
-		String text = cardVar.describe(-1).trim().toLowerCase();
-		// Voltage sources (Vxx, vxx)
-		if (text.startsWith("v") && text.length() > 1 && Character.isLetterOrDigit(text.charAt(1)))
+		String text = cardVar.describe(-1).trim();
+
+		// Check ALL lines — multiline SPICE cards may have comments + sources
+		for (String line : text.split("\n"))
 		{
-			// Check it's a voltage source line: V<name> <node> <node> <value>
-			String[] parts = text.split("\\s+");
-			if (parts.length >= 3) return true;
+			String l = line.trim().toLowerCase();
+			if (l.isEmpty() || l.startsWith("*")) continue; // skip comments
+
+			// Voltage sources (Vxx)
+			if (l.startsWith("v") && l.length() > 1 && Character.isLetterOrDigit(l.charAt(1)))
+				return true;
+			// Current sources (Ixx)
+			if (l.startsWith("i") && l.length() > 1 && Character.isLetterOrDigit(l.charAt(1)))
+				return true;
+			// Analysis commands
+			if (l.startsWith(".tran") || l.startsWith(".dc") ||
+				l.startsWith(".ac") || l.startsWith(".op") ||
+				l.startsWith(".global") || l.startsWith(".end"))
+				return true;
 		}
-		// Current sources (Ixx)
-		if (text.startsWith("i") && text.length() > 1 && Character.isLetterOrDigit(text.charAt(1)))
-		{
-			String[] parts = text.split("\\s+");
-			if (parts.length >= 3) return true;
-		}
-		// Analysis commands
-		if (text.startsWith(".tran") || text.startsWith(".dc") ||
-			text.startsWith(".ac") || text.startsWith(".op") ||
-			text.startsWith(".global") || text.startsWith(".end"))
-			return true;
 		return false;
 	}
 
