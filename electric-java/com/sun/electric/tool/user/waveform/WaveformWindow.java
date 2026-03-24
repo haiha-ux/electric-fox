@@ -432,11 +432,13 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		});
 
 		// Truth Table toggle button
-		JButton truthTableBtn = new JButton("Truth Table");
-		truthTableBtn.setFont(truthTableBtn.getFont().deriveFont(10f));
+		ImageIcon truthTableIcon = Resources.getIcon(WaveformWindow.class, "ButtonTruthTable");
+		JButton truthTableBtn = new JButton(truthTableIcon);
 		styleWaveformButton(truthTableBtn);
 		truthTableBtn.setToolTipText("Toggle truth table analysis panel");
-		truthTableBtn.setPreferredSize(new Dimension(90, 24));
+		Dimension ttMinWid = new Dimension(truthTableIcon.getIconWidth()+8, truthTableIcon.getIconHeight()+8);
+		truthTableBtn.setMinimumSize(ttMinWid);
+		truthTableBtn.setPreferredSize(ttMinWid);
 		gbc = new GridBagConstraints();
 		gbc.gridx = 10;      gbc.gridy = 1;
 		gbc.anchor = GridBagConstraints.WEST;
@@ -3920,8 +3922,17 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		wavePanels.set(newIndex, panel);
 
 		rebuildPanelList();
-		overall.validate();
+		// Force full repaint of all panels to prevent blank areas
+		for (Panel wp : wavePanels)
+		{
+			wp.getLeftHalf().revalidate();
+			wp.getLeftHalf().repaint();
+			wp.repaintContents();
+		}
+		table.revalidate();
 		table.repaint();
+		overall.validate();
+		overall.repaint();
 		saveSignalOrder();
 	}
 
