@@ -431,29 +431,6 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 			public void actionPerformed(ActionEvent evt) { growPanels(0.8); }
 		});
 
-		// Panel reorder buttons
-		JButton panelUpBtn = new JButton("\u25B2"); // ▲
-		panelUpBtn.setFont(panelUpBtn.getFont().deriveFont(9f));
-		styleWaveformButton(panelUpBtn);
-		panelUpBtn.setToolTipText("Move selected panel up");
-		panelUpBtn.setPreferredSize(new Dimension(28, 24));
-		gbc = new GridBagConstraints();
-		gbc.gridx = 8;       gbc.gridy = 0;
-		gbc.anchor = GridBagConstraints.CENTER;
-		overall.add(panelUpBtn, gbc);
-		panelUpBtn.addActionListener(e -> moveSelectedPanel(true));
-
-		JButton panelDownBtn = new JButton("\u25BC"); // ▼
-		panelDownBtn.setFont(panelDownBtn.getFont().deriveFont(9f));
-		styleWaveformButton(panelDownBtn);
-		panelDownBtn.setToolTipText("Move selected panel down");
-		panelDownBtn.setPreferredSize(new Dimension(28, 24));
-		gbc = new GridBagConstraints();
-		gbc.gridx = 8;       gbc.gridy = 1;
-		gbc.anchor = GridBagConstraints.CENTER;
-		overall.add(panelDownBtn, gbc);
-		panelDownBtn.addActionListener(e -> moveSelectedPanel(false));
-
 		// Truth Table toggle button
 		JButton truthTableBtn = new JButton("Truth Table");
 		truthTableBtn.setFont(truthTableBtn.getFont().deriveFont(10f));
@@ -3918,26 +3895,33 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 	 */
 	public void moveSelectedPanel(boolean up)
 	{
-		for (int i = 0; i < wavePanels.size(); i++)
+		// Find the selected or focused panel
+		Panel target = null;
+		for (Panel wp : wavePanels)
 		{
-			Panel wp = wavePanels.get(i);
-			if (wp.isSelected())
-			{
-				int newIndex = up ? i - 1 : i + 1;
-				if (newIndex < 0 || newIndex >= wavePanels.size()) return;
-
-				// Swap panels
-				wavePanels.set(i, wavePanels.get(newIndex));
-				wavePanels.set(newIndex, wp);
-
-				// Rebuild the table display
-				rebuildPanelList();
-				overall.validate();
-				table.repaint();
-				saveSignalOrder();
-				return;
-			}
+			if (wp.isSelected()) { target = wp; break; }
 		}
+		if (target == null && wavePanels.size() > 0) return;
+		movePanel(target, up);
+	}
+
+	/**
+	 * Move a specific panel up or down in the list.
+	 */
+	public void movePanel(Panel panel, boolean up)
+	{
+		int i = wavePanels.indexOf(panel);
+		if (i < 0) return;
+		int newIndex = up ? i - 1 : i + 1;
+		if (newIndex < 0 || newIndex >= wavePanels.size()) return;
+
+		wavePanels.set(i, wavePanels.get(newIndex));
+		wavePanels.set(newIndex, panel);
+
+		rebuildPanelList();
+		overall.validate();
+		table.repaint();
+		saveSignalOrder();
 	}
 
 	public void toggleTruthTable()
@@ -3946,14 +3930,17 @@ public class WaveformWindow implements WindowContent, PropertyChangeListener
 		truthTablePanel.setVisible(visible);
 		if (visible)
 		{
-			truthTableSplit.setDividerLocation(truthTableSplit.getWidth() - 380);
-			truthTablePanel.analyzeFromPanels();
+			// Show panel first, analyze later (non-blocking)
+			javax.swing.SwingUtilities.invokeLater(() -> {
+				truthTableSplit.setDividerLocation(truthTableSplit.getWidth() - 380);
+				truthTableSplit.revalidate();
+			});
 		}
 		else
 		{
 			truthTableSplit.setDividerLocation(1.0);
+			truthTableSplit.revalidate();
 		}
-		truthTableSplit.revalidate();
 	}
 
 	/**

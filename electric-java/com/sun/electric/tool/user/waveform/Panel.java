@@ -286,6 +286,42 @@ public class Panel extends JPanel
 		gbc.fill = GridBagConstraints.NONE;
 		gbc.insets = new Insets(0, 2, 0, 4);
 		leftHalf.add(deleteAllSignals, gbc);
+		// the "move up" button for this panel
+		JButton moveUp = new JButton("\u25B2");
+		moveUp.setFont(moveUp.getFont().deriveFont(8f));
+		moveUp.setBorderPainted(false);
+		moveUp.setDefaultCapable(false);
+		moveUp.setToolTipText("Move this panel up");
+		moveUp.setMinimumSize(new Dimension(18, 16));
+		moveUp.setPreferredSize(new Dimension(18, 16));
+		gbc = new GridBagConstraints();
+		gbc.gridx = 5;       gbc.gridy = 1;
+		gbc.fill = GridBagConstraints.NONE;
+		gbc.insets = new Insets(0, 2, 0, 0);
+		leftHalf.add(moveUp, gbc);
+		moveUp.addActionListener(new ActionListener()
+		{
+			public void actionPerformed(ActionEvent evt) { waveWindow.moveSelectedPanel(true); }
+		});
+
+		// the "move down" button for this panel
+		JButton moveDown = new JButton("\u25BC");
+		moveDown.setFont(moveDown.getFont().deriveFont(8f));
+		moveDown.setBorderPainted(false);
+		moveDown.setDefaultCapable(false);
+		moveDown.setToolTipText("Move this panel down");
+		moveDown.setMinimumSize(new Dimension(18, 16));
+		moveDown.setPreferredSize(new Dimension(18, 16));
+		gbc = new GridBagConstraints();
+		gbc.gridx = 6;       gbc.gridy = 1;
+		gbc.fill = GridBagConstraints.NONE;
+		gbc.insets = new Insets(0, 0, 0, 2);
+		leftHalf.add(moveDown, gbc);
+		moveDown.addActionListener(new ActionListener()
+		{
+			public void actionPerformed(ActionEvent evt) { waveWindow.moveSelectedPanel(false); }
+		});
+
 		deleteAllSignals.addActionListener(new ActionListener()
 		{
 			public void actionPerformed(ActionEvent evt) { deleteAllSignalsFromPanel(); }
