@@ -1097,38 +1097,43 @@ public class AnalogLayoutEngine
 			List<PortInst> ports = entry.getValue();
 			if (ports.size() < 2) continue;
 
-			// Create unrouted arcs in MST order (connect nearest pairs first)
-			List<PortInst> connected = new ArrayList<PortInst>();
-			connected.add(ports.get(0));
+			// Find the most central port (closest to centroid) as hub
+			double cx = 0, cy = 0;
+			for (PortInst p : ports) { cx += p.getCenter().getLambdaX(); cy += p.getCenter().getLambdaY(); }
+			cx /= ports.size(); cy /= ports.size();
 
-			while (connected.size() < ports.size())
+			PortInst hub = ports.get(0);
+			double bestDist = Double.MAX_VALUE;
+			for (PortInst p : ports)
 			{
-				PortInst bestFrom = null, bestTo = null;
-				double bestDist = Double.MAX_VALUE;
+				double d = Math.abs(p.getCenter().getLambdaX() - cx) + Math.abs(p.getCenter().getLambdaY() - cy);
+				if (d < bestDist) { bestDist = d; hub = p; }
+			}
 
-				for (PortInst from : connected)
+			// Connect each non-hub port to the hub with an unrouted arc
+			// SOG will find optimal paths — only need N-1 arcs minimum
+			// Use pairs instead of star to avoid redundancy: connect sequential pairs
+			List<PortInst> sorted = new ArrayList<PortInst>(ports);
+			final PortInst hubFinal = hub;
+			// Sort by distance from hub
+			Collections.sort(sorted, new Comparator<PortInst>()
+			{
+				public int compare(PortInst a, PortInst b)
 				{
-					for (PortInst to : ports)
-					{
-						if (connected.contains(to)) continue;
-						double dx = from.getCenter().getLambdaX() - to.getCenter().getLambdaX();
-						double dy = from.getCenter().getLambdaY() - to.getCenter().getLambdaY();
-						double dist = Math.abs(dx) + Math.abs(dy);
-						if (dist < bestDist)
-						{
-							bestDist = dist;
-							bestFrom = from;
-							bestTo = to;
-						}
-					}
+					double da = Math.abs(a.getCenter().getLambdaX() - hubFinal.getCenter().getLambdaX()) +
+						Math.abs(a.getCenter().getLambdaY() - hubFinal.getCenter().getLambdaY());
+					double db = Math.abs(b.getCenter().getLambdaX() - hubFinal.getCenter().getLambdaX()) +
+						Math.abs(b.getCenter().getLambdaY() - hubFinal.getCenter().getLambdaY());
+					return Double.compare(da, db);
 				}
+			});
 
-				if (bestTo == null) break;
-				connected.add(bestTo);
-
+			// Chain: connect each port to the next nearest (sequential pairs)
+			for (int i = 1; i < sorted.size(); i++)
+			{
 				try
 				{
-					ArcInst ai = ArcInst.makeInstance(unroutedArc, ep, bestFrom, bestTo);
+					ArcInst ai = ArcInst.makeInstance(unroutedArc, ep, sorted.get(i - 1), sorted.get(i));
 					if (ai != null)
 					{
 						arcsToRoute.add(ai);

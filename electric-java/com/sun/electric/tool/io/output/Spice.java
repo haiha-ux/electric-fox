@@ -568,6 +568,36 @@ public class Spice extends Topology
 	}
 
 	/**
+	 * Check if a SPICE_CARD_KEY variable contains content that should only
+	 * appear at the top level (voltage sources, analysis commands, .global).
+	 * These are skipped when writing sub-cells to avoid duplicates.
+	 */
+	private boolean isTopLevelOnlySpice(Variable cardVar)
+	{
+		if (cardVar == null) return false;
+		String text = cardVar.describe(-1).trim().toLowerCase();
+		// Voltage sources (Vxx, vxx)
+		if (text.startsWith("v") && text.length() > 1 && Character.isLetterOrDigit(text.charAt(1)))
+		{
+			// Check it's a voltage source line: V<name> <node> <node> <value>
+			String[] parts = text.split("\\s+");
+			if (parts.length >= 3) return true;
+		}
+		// Current sources (Ixx)
+		if (text.startsWith("i") && text.length() > 1 && Character.isLetterOrDigit(text.charAt(1)))
+		{
+			String[] parts = text.split("\\s+");
+			if (parts.length >= 3) return true;
+		}
+		// Analysis commands
+		if (text.startsWith(".tran") || text.startsWith(".dc") ||
+			text.startsWith(".ac") || text.startsWith(".op") ||
+			text.startsWith(".global") || text.startsWith(".end"))
+			return true;
+		return false;
+	}
+
+	/**
 	 * Method called by traversal mechanism to write one level of hierarchy in the Spice netlist.
 	 * This could be the top level or a subcircuit.
 	 * The bulk of the Spice netlisting happens here.
@@ -840,12 +870,15 @@ public class Spice extends Topology
 		if (!useCDL)
 		{
 			boolean firstDecl = true;
+			boolean isDeclSubCell = (cell != topCell);
 			for(Iterator<NodeInst> it = cell.getNodes(); it.hasNext(); )
 			{
 				NodeInst ni = it.next();
 				if (ni.getProto() != Generic.tech().invisiblePinNode) continue;
 				Variable cardVar = ni.getVar(SPICE_DECLARATION_KEY);
 				if (cardVar == null) continue;
+				// Skip top-level-only SPICE in sub-cells (voltage sources, analysis commands)
+				if (isDeclSubCell && isTopLevelOnlySpice(cardVar)) continue;
 				if (firstDecl)
 				{
 					firstDecl = false;
@@ -1660,12 +1693,19 @@ public class Spice extends Topology
 		if (!useCDL)
 		{
 			boolean firstDecl = true;
+			boolean isSubCell = (cell != topCell);
 			for(Iterator<NodeInst> it = cell.getNodes(); it.hasNext(); )
 			{
 				NodeInst ni = it.next();
 				if (ni.getProto() != Generic.tech().invisiblePinNode) continue;
 				Variable cardVar = ni.getVar(SPICE_CARD_KEY);
 				if (cardVar == null) continue;
+
+				// For sub-cells: skip voltage sources and analysis commands
+				// These should only appear at top level to avoid duplicates
+				if (isSubCell && isTopLevelOnlySpice(cardVar))
+					continue;
+
 				if (firstDecl)
 				{
 					firstDecl = false;
